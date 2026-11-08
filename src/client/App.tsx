@@ -11,6 +11,8 @@ import {
   LogOut,
   Maximize2,
   Palette,
+  Shield,
+  Terminal,
   XCircle,
 } from 'lucide-react';
 import {
@@ -27,6 +29,7 @@ import { ExplorerTab, FilePane } from './components/FilePane';
 import { PreviewModal } from './components/PreviewModal';
 import { RemotesView } from './components/RemotesView';
 import { SchedulesView } from './components/SchedulesView';
+import { SecurityCenterModal } from './components/SecurityCenterModal';
 import { TasksView } from './components/TasksView';
 import { LOCALE_OPTIONS, LocaleCode, THEME_OPTIONS, ThemeId, useI18n } from './i18n';
 import { formatSpeed } from './utils/format';
@@ -46,6 +49,9 @@ export const App: React.FC = () => {
   const [authChecking, setAuthChecking] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
   const [authenticated, setAuthenticated] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [securityModalOpen, setSecurityModalOpen] = useState(false);
+  const [recentLoginPassword, setRecentLoginPassword] = useState<string>('');
   const [loginUser, setLoginUser] = useState('admin');
   const [loginPass, setLoginPass] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -140,6 +146,7 @@ export const App: React.FC = () => {
       .then((res) => {
         setAuthRequired(res.authRequired);
         setAuthenticated(res.authenticated);
+        setMustChangePassword(Boolean(res.mustChangePassword));
         setLoginUser(res.username || 'admin');
       })
       .catch(() => {})
@@ -163,8 +170,13 @@ export const App: React.FC = () => {
     e.preventDefault();
     setLoginError(null);
     try {
-      const res = await api.login(loginUser, loginPass);
+      const usedPass = loginPass;
+      const res = await api.login(loginUser, usedPass);
       setAuthToken(res.token);
+      setLoginUser(res.username || loginUser);
+      setAuthRequired(res.authRequired);
+      setMustChangePassword(Boolean(res.mustChangePassword));
+      setRecentLoginPassword(usedPass);
       setAuthenticated(true);
       setLoginPass('');
     } catch (err: any) {
@@ -174,6 +186,8 @@ export const App: React.FC = () => {
 
   const handleLogout = () => {
     setAuthToken('');
+    setRecentLoginPassword('');
+    setSecurityModalOpen(false);
     setAuthenticated(false);
   };
 
@@ -238,7 +252,7 @@ export const App: React.FC = () => {
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
-  const displayAppVersion = systemStatus?.appVersion || '2.1';
+  const displayAppVersion = systemStatus?.appVersion || '2.2';
 
   if (authChecking) {
     return (
@@ -257,21 +271,28 @@ export const App: React.FC = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-slate-950 p-4">
         <form
           onSubmit={handleLogin}
-          className="bg-slate-900 border border-slate-800 rounded-2xl p-7 w-full max-w-sm shadow-2xl space-y-5"
+          className="bg-slate-900 border border-slate-800 rounded-2xl p-7 w-full max-w-md shadow-2xl space-y-5"
         >
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-sky-500/15 text-sky-400">
-              <Lock className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold text-slate-100">RcloneBrowser Next Gen</h1>
-              <p className="text-xs text-slate-400">
-                {tr(
-                  '容器已启用访问认证保护',
-                  '容器已啟用存取驗證保護',
-                  'Authentication is enabled for this container'
-                )}
-              </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-sky-500/15 text-sky-400">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-bold text-slate-100">RcloneBrowser Next Gen</h1>
+                  <span className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] font-mono text-sky-300">
+                    v{displayAppVersion}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {tr(
+                    'Scrypt 加密访问保护已启用',
+                    'Scrypt 加密存取保護已啟用',
+                    'Scrypt authentication protection enabled'
+                  )}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -284,7 +305,7 @@ export const App: React.FC = () => {
           <div className="space-y-3 text-xs">
             <div>
               <label className="block text-slate-400 mb-1">
-                {tr('用户名 (APP_USERNAME)', '使用者名稱 (APP_USERNAME)', 'Username (APP_USERNAME)')}
+                {tr('管理员用户名', '管理員使用者名稱', 'Administrator Username')}
               </label>
               <input
                 type="text"
@@ -297,7 +318,7 @@ export const App: React.FC = () => {
 
             <div>
               <label className="block text-slate-400 mb-1">
-                {tr('访问密码 (APP_PASSWORD)', '存取密碼 (APP_PASSWORD)', 'Password (APP_PASSWORD)')}
+                {tr('访问密码', '存取密碼', 'Password')}
               </label>
               <input
                 type="password"
@@ -306,9 +327,9 @@ export const App: React.FC = () => {
                 value={loginPass}
                 onChange={(e) => setLoginPass(e.target.value)}
                 placeholder={tr(
-                  '输入容器环境变量设置的密码',
-                  '輸入容器環境變數設定的密碼',
-                  'Enter password configured in container env'
+                  '首次登录请输入容器日志输出的初始随机密码',
+                  '首次登入請輸入容器日誌輸出的初始隨機密碼',
+                  'First login? Enter initial password from container logs'
                 )}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
               />
@@ -317,10 +338,26 @@ export const App: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors"
+            className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors shadow"
           >
             {tr('登录控制台', '登入控制台', 'Sign In')}
           </button>
+
+          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-1.5 text-[11px] text-slate-400">
+            <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+              <Terminal className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span>
+                {tr(
+                  '首次启动：查看容器 Console 初始密码',
+                  '首次啟動：查看容器 Console 初始密碼',
+                  'First-time setup: View initial password in container logs'
+                )}
+              </span>
+            </div>
+            <code className="block font-mono text-[10px] text-sky-300 bg-slate-900 px-2 py-1 rounded border border-slate-800 select-all">
+              docker logs rclonebrowser-next
+            </code>
+          </div>
         </form>
       </div>
     );
@@ -477,6 +514,26 @@ export const App: React.FC = () => {
             </select>
           </div>
 
+          {/* Security Center Button */}
+          <button
+            onClick={() => setSecurityModalOpen(true)}
+            title={tr(
+              '安全与密码中心 (/config/auth.json)',
+              '安全與密碼中心 (/config/auth.json)',
+              'Security & Password Center (/config/auth.json)'
+            )}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              authRequired
+                ? 'bg-slate-950 border-slate-800 text-emerald-400 hover:border-emerald-500/50'
+                : 'bg-amber-950/30 border-amber-700/50 text-amber-300 hover:border-amber-500'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">
+              {tr('安全中心', '安全中心', 'Security')}
+            </span>
+          </button>
+
           {authRequired && (
             <button
               onClick={handleLogout}
@@ -630,6 +687,25 @@ export const App: React.FC = () => {
           onClose={() => setPreviewTarget(null)}
         />
       )}
+
+      {/* Security Center & Forced First-Login Password Change Modal */}
+      <SecurityCenterModal
+        isOpen={mustChangePassword || securityModalOpen}
+        forcedFirstLogin={mustChangePassword}
+        currentUsername={loginUser}
+        authRequired={authRequired}
+        recentLoginPassword={recentLoginPassword}
+        onClose={() => setSecurityModalOpen(false)}
+        onUpdated={(res) => {
+          setLoginUser(res.username);
+          setAuthRequired(res.authRequired);
+          setMustChangePassword(res.mustChangePassword);
+          setRecentLoginPassword('');
+          loadTasksAndStatus();
+        }}
+        onLogout={handleLogout}
+        onNotify={notify}
+      />
 
       {/* Floating Toasts */}
       <div className="fixed bottom-9 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">

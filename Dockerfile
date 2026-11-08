@@ -35,9 +35,7 @@ ENV APP_NAME="RcloneBrowser Next Gen" \
     TZ="Asia/Shanghai" \
     CONFIG_DIR="/config" \
     MEDIA_DIR="/media" \
-    RCLONE_CONFIG="/config/rclone/rclone.conf" \
-    APP_USERNAME="admin" \
-    APP_PASSWORD=""
+    RCLONE_CONFIG="/config/rclone/rclone.conf"
 
 # Install runtime dependencies & latest official Rclone binary
 RUN apk update && \
@@ -88,7 +86,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 LABEL org.opencontainers.image.title="RcloneBrowser Next Gen" \
       org.opencontainers.image.description="Modern Native Web GUI for Rclone in Docker" \
-      org.opencontainers.image.version="2.1" \
+      org.opencontainers.image.version="2.2" \
       org.opencontainers.image.source="https://github.com/kevinzfjiang/rclonebrowser-next-gen"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

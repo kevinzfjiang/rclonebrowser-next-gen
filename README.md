@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.1-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.2-0284c7.svg)](./version.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
 > 📖 **Documentation**: **English** | **[简体中文文档 (README_CN.md)](./README_CN.md)**
@@ -17,17 +17,18 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ## ✨ Why Upgrade to RcloneBrowser Next Gen?
 
-| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.1`)** |
+| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.2`)** |
 | :--- | :--- | :--- |
 | **UI Experience** | X11/noVNC remote desktop video stream; blurry fonts, high latency, unusable on mobile | **Native 60fps Web UI** with drag-and-drop upload, inline preview, 5 themes & 3 languages |
 | **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + lightweight Node.js API**; zero X11/Qt5 bloat |
 | **Memory Footprint** | ~350MB - 500MB idle | **~40MB idle** |
+| **Security** | VNC plaintext or insecure Docker `ENV` passwords | **Console Initial Random Password + Forced First-Login Password Change + Salted Scrypt Hash (`/config/auth.json`) + Brute-Force Protection** |
 | **Core Capabilities** | Basic desktop window | **Dual-Pane Commander, Pause/Resume Task Queue, Per-Remote Proxy, Cron Scheduler** |
 | **Drop-in Compatibility** | `/config`, `/media`, port `5800` | **100% compatible**; auto-migrates legacy `/config/xdg/config/rclone/rclone.conf` on startup |
 
 ---
 
-## 🛠️ Key Features (v2.1)
+## 🛠️ Key Features (v2.2)
 
 1. **Multi-Tab & Dual-Pane Commander File Explorer (`Explorer`)**
    - Switch between **Dual-Pane Commander** and **Single-Pane** layouts with independent multi-tab bars per pane.
@@ -51,11 +52,56 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
    - Automate periodic `Copy`, `Sync`, or `Move` jobs using visual presets or custom 5-field Cron expressions.
    - Enable/disable schedules anytime, inspect next/last run timestamps, or click **Run Now** to trigger immediately.
 
-5. **Multi-Theme & Multi-Language UI + Auto Rclone Version Check**
+5. **Production-Grade Security & Authentication (`v2.2`)**
+   - **No Plaintext Docker ENV Passwords**: Eliminates `APP_PASSWORD` leaks from `docker inspect` or `docker-compose.yml`.
+   - **Console Initial Random Password**: On first startup, generates a strong random password (`RbN-xxxxxxxxxxxx`) and prints it in `docker logs rclonebrowser-next`.
+   - **Forced First-Login Password Change**: Signing in with the initial password immediately prompts you to set your own administrator password.
+   - **Salted `scrypt` Hash Persistence**: Only the salted `scrypt` hash (`0600` permissions) is stored in `/config/auth.json`.
+   - **Security Center & Passwordless LAN Mode**: Change username/password or toggle **Passwordless Direct Mode** (for trusted home LANs) anytime from the top bar **Security** button.
+   - **IP Brute-Force Protection & One-Command CLI Reset**: Automatically locks out an IP for 5 minutes after 5 consecutive failed login attempts, and includes a built-in CLI password reset tool.
+
+6. **Multi-Theme & Multi-Language UI + Auto Rclone Version Check**
    - **5 Built-in Themes**: `Slate Dark`, `Light Mode`, `Cyberpunk Neon`, `OLED Pure Black`, and `Nordic Frost`.
    - **3 Languages**: `简体中文`, `繁體中文`, and `English`.
    - **Automatic Rclone Update Detection**: Automatically checks official Rclone releases and highlights new versions in the bottom status bar (e.g. `Rclone v1.76.0 / v1.77.0 (new)`).
    - **Configurable Version**: Managed centrally via [`version.json`](./version.json).
+
+---
+
+## 🔐 First-Time Login & Password Management (v2.2+)
+
+### 1. View Initial Password in Container Logs
+When you start the container for the first time (when `/config/auth.json` does not exist yet), check the container console output:
+
+```bash
+docker logs rclonebrowser-next
+```
+
+You will see a banner like this:
+```text
+============================================================
+🔐 [SECURITY] INITIAL ADMINISTRATOR CREDENTIALS GENERATED
+------------------------------------------------------------
+ 👤 Username         : admin
+ 🔑 Initial Password : RbN-9kX4mP7vQ2wL
+------------------------------------------------------------
+ ⚠️  Please sign in using the initial password above.
+ ⚠️  You will be required to change your password on first login.
+ 💾 Salted scrypt hash saved to: /config/auth.json
+============================================================
+```
+
+### 2. First Login & Security Center
+- Sign in at `http://<your-nas-ip>:5800` using `admin` and the initial password above.
+- You will be prompted to set a new password (or switch to **Passwordless LAN Mode** if running in a trusted home network).
+- Anytime later, click **Security (`安全中心`)** in the top navigation bar to update your username, change your password, or toggle authentication mode.
+
+### 3. Forgot Password? One-Command CLI Reset
+If you ever forget your password, run the following command on your Docker host to generate and print a new temporary password:
+
+```bash
+docker exec -it rclonebrowser-next node dist/server/reset-password.js
+```
 
 ---
 
@@ -83,9 +129,6 @@ services:
       - PORT=5800
       # Register multiple local mounts as standalone dropdown items in the Explorer
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
-      # Optional: Set Web UI login password (leave APP_PASSWORD empty for passwordless access)
-      - APP_USERNAME=admin
-      - APP_PASSWORD=
     volumes:
       - /volume1/docker/rclonebrowser/config:/config
       - /volume3/NAS:/media/NAS
@@ -97,6 +140,7 @@ Start the container:
 
 ```bash
 docker compose up -d
+docker logs rclonebrowser-next
 ```
 
 Open in your browser: `http://<your-nas-ip>:5800`
@@ -112,8 +156,6 @@ docker run -d \
   -e PUID=1000 \
   -e PGID=1000 \
   -e TZ=Asia/Shanghai \
-  -e APP_USERNAME=admin \
-  -e APP_PASSWORD=your_secret_password \
   -v /path/to/config:/config \
   -v /path/to/media:/media \
   --restart unless-stopped \
@@ -131,9 +173,7 @@ docker run -d \
 | `PGID` | `1000` | Process GID |
 | `TZ` | `Asia/Shanghai` | Container timezone (used for logs and Cron schedules) |
 | `LOCAL_MOUNTS` | *(empty)* | Comma-separated shortcut mounts, e.g. `NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos` |
-| `APP_USERNAME` | `admin` | Web UI login username |
-| `APP_PASSWORD` | *(empty)* | Web UI login password. If empty, authentication is bypassed; if set, login is required |
-| `CONFIG_DIR` | `/config` | Persistent configuration and task database directory |
+| `CONFIG_DIR` | `/config` | Persistent configuration, `auth.json`, and task database directory |
 | `MEDIA_DIR` | `/media` | Primary local data mount directory |
 
 ---
@@ -146,9 +186,9 @@ docker run -d \
 git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
 cd rclonebrowser-next-gen
 
-docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.1 .
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.2 .
 docker push yadiman/rclonebrowser-next-gen:latest
-docker push yadiman/rclonebrowser-next-gen:2.1
+docker push yadiman/rclonebrowser-next-gen:2.2
 ```
 
 ### 2. Local Node.js Development
@@ -157,8 +197,9 @@ Requires `Node.js >= 20` and `rclone` CLI installed locally:
 
 ```bash
 npm install
-npm run dev     # Starts Express backend (:5800) + Vite HMR frontend (:5173)
-npm run build   # Builds production frontend and backend
-npm test        # Runs integration smoke tests against Rclone
-npm start       # Starts production server on port 5800
+npm run dev             # Starts Express backend (:5800) + Vite HMR frontend (:5173)
+npm run build           # Builds production frontend and backend
+npm test                # Runs integration smoke tests against Rclone & AuthService
+npm run reset-password  # Resets admin password and prints new temporary password
+npm start               # Starts production server on port 5800
 ```

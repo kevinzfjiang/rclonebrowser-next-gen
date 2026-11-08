@@ -1,14 +1,12 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
   APP_NAME,
-  APP_PASSWORD,
-  APP_USERNAME,
   APP_VERSION,
+  AUTH_DB_PATH,
   CONFIG_DIR,
   ensureDirectoriesAndDefaults,
   MEDIA_DIR,
@@ -18,6 +16,7 @@ import {
   SERVER_PORT,
   UPLOAD_TEMP_DIR,
 } from './config.js';
+import { authService, AuthError } from './authService.js';
 import {
   calculateDirSize,
   createFileReadStream,
@@ -29,7 +28,7 @@ import {
   listRemotes,
   makeDirectory,
   renameEntry,
-   sanitizeRelPath,
+  sanitizeRelPath,
   saveRawConfig,
   uploadLocalFilesToRemote,
   upsertRemote,
@@ -46,68 +45,80 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-const SECRET_SALT = crypto.randomBytes(32).toString('hex');
-
-function createAuthToken(username: string): string {
-  return crypto
-    .createHmac('sha256', SECRET_SALT)
-    .update(`${username}:${APP_PASSWORD}`)
-    .digest('hex');
-}
-
-function isTokenValid(token: string | undefined): boolean {
-  if (!APP_PASSWORD) return true;
-  if (!token) return false;
-  const expected = createAuthToken(APP_USERNAME);
-  return token === expected;
-}
-
-function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (!APP_PASSWORD) {
-    next();
-    return;
-  }
+function extractBearerToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : undefined;
   const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  return bearerToken || queryToken;
+}
 
-  if (isTokenValid(bearerToken || queryToken)) {
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!authService.isAuthEnabled()) {
+    next();
+    return;
+  }
+  const token = extractBearerToken(req);
+  if (authService.isTokenValid(token)) {
     next();
     return;
   }
 
-  res.status(401).json({ error: '未授权访问，请先登录' });
+  res.status(401).json({ error: 'Unauthorized access, please sign in first.' });
 }
 
 // --- Auth Endpoints ---
 app.get('/api/auth/status', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : undefined;
-  res.json({
-    authRequired: Boolean(APP_PASSWORD),
-    authenticated: isTokenValid(bearerToken),
-    username: APP_USERNAME,
-  });
+  const token = extractBearerToken(req);
+  res.json(authService.getStatus(token));
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { username, password } = req.body || {};
-  if (!APP_PASSWORD) {
-    res.json({ token: 'no-auth-required', username: APP_USERNAME });
-    return;
+  try {
+    const { username, password } = req.body || {};
+    const clientIp = getClientIp(req);
+    const result = authService.login(clientIp, String(username || ''), String(password || ''));
+    res.json(result);
+  } catch (err: any) {
+    if (err instanceof AuthError) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        retryAfterSeconds: err.retryAfterSeconds,
+      });
+      return;
+    }
+    res.status(401).json({ error: err.message || 'Authentication failed' });
   }
-  if (username === APP_USERNAME && password === APP_PASSWORD) {
-    res.json({
-      token: createAuthToken(APP_USERNAME),
-      username: APP_USERNAME,
-    });
-    return;
-  }
-  res.status(401).json({ error: '用户名或密码错误' });
 });
 
 // Protect all other /api routes
 app.use('/api', authMiddleware);
+
+app.post('/api/auth/update', (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newUsername, newPassword, authEnabled } = req.body || {};
+    const result = authService.updateSecurity({
+      currentPassword,
+      newUsername,
+      newPassword,
+      authEnabled,
+    });
+    res.json(result);
+  } catch (err: any) {
+    if (err instanceof AuthError) {
+      res.status(err.statusCode).json({ error: err.message });
+      return;
+    }
+    res.status(400).json({ error: err.message || 'Failed to update security settings' });
+  }
+});
 
 // --- System Status Endpoints ---
 app.get('/api/system/status', async (_req: Request, res: Response) => {
@@ -130,7 +141,7 @@ app.get('/api/system/status', async (_req: Request, res: Response) => {
       mediaDir: MEDIA_DIR,
       puid: PUID,
       pgid: PGID,
-      authEnabled: Boolean(APP_PASSWORD),
+      authEnabled: authService.isAuthEnabled(),
       globalBwLimit: taskManager.getGlobalBwLimit(),
       activeTasksCount: activeStats.activeTasksCount,
       totalSpeed: activeStats.totalSpeed,
@@ -523,11 +534,16 @@ export { app };
 if (process.env.NODE_ENV !== 'test') {
   app.listen(SERVER_PORT, '0.0.0.0', () => {
     console.log(`============================================================`);
-    console.log(`🚀 RcloneBrowser Next Gen Server is running!`);
+    console.log(`🚀 RcloneBrowser Next Gen v${APP_VERSION} Server is running!`);
     console.log(`🌐 Web GUI URL    : http://0.0.0.0:${SERVER_PORT}`);
     console.log(`📂 Config Path    : ${RCLONE_CONFIG_PATH}`);
+    console.log(`🔐 Auth Database  : ${AUTH_DB_PATH}`);
     console.log(`💾 Local Media    : ${MEDIA_DIR}`);
-    console.log(`🔒 Auth Enabled   : ${APP_PASSWORD ? 'YES (Protected)' : 'NO (Open Mode)'}`);
+    console.log(
+      `🔒 Auth Enabled   : ${
+        authService.isAuthEnabled() ? 'YES (Scrypt Protected)' : 'NO (Passwordless Direct Mode)'
+      }`
+    );
     console.log(`============================================================`);
   });
 }

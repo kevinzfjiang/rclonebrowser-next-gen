@@ -13,9 +13,10 @@ services:
       - PORT=5800
       # Optional: Register multiple local mounts as standalone dropdown items in the Explorer
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
-      # Optional: Set Web UI login username and password (leave APP_PASSWORD empty for passwordless access)
-      - APP_USERNAME=admin
-      - APP_PASSWORD=
+      # Security Note (v2.2+):
+      # On first startup, a random initial password is automatically generated and printed in container logs:
+      #   docker logs rclonebrowser-next
+      # After signing in, you will be prompted to set a new password (stored as a salted scrypt hash in /config/auth.json).
     volumes:
       - /volume1/docker/rclonebrowser/config:/config
       - /volume3/NAS:/media/NAS

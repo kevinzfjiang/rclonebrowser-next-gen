@@ -44,13 +44,13 @@ async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T
     headers,
   });
 
-  if (res.status === 401) {
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && !url.startsWith('/api/auth/')) {
     throw new Error('UNAUTHORIZED');
   }
 
-  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || `请求失败 (HTTP ${res.status})`);
+    throw new Error(data.error || `Request failed (HTTP ${res.status})`);
   }
   return data as T;
 }
@@ -58,14 +58,38 @@ async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T
 export const api = {
   // Auth
   getAuthStatus: () =>
-    requestJson<{ authRequired: boolean; authenticated: boolean; username: string }>(
-      '/api/auth/status'
-    ),
+    requestJson<{
+      authRequired: boolean;
+      authenticated: boolean;
+      username: string;
+      mustChangePassword: boolean;
+    }>('/api/auth/status'),
 
   login: (username: string, password: string) =>
-    requestJson<{ token: string; username: string }>('/api/auth/login', {
+    requestJson<{
+      token: string;
+      username: string;
+      mustChangePassword: boolean;
+      authRequired: boolean;
+    }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
+    }),
+
+  updateSecurity: (payload: {
+    currentPassword?: string;
+    newUsername?: string;
+    newPassword?: string;
+    authEnabled?: boolean;
+  }) =>
+    requestJson<{
+      token: string;
+      username: string;
+      authRequired: boolean;
+      mustChangePassword: boolean;
+    }>('/api/auth/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   // System

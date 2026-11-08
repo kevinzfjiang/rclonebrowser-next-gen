@@ -42,7 +42,7 @@ function loadAppVersion(): { name: string; version: string } {
   }
   return {
     name: 'RcloneBrowser Next Gen',
-    version: process.env.APP_VERSION || '2.1',
+    version: process.env.APP_VERSION || '2.2',
   };
 }
 
@@ -59,10 +59,9 @@ export const UPLOAD_TEMP_DIR = path.join(CONFIG_DIR, 'tmp_uploads');
 export const TASKS_DB_PATH = path.join(CONFIG_DIR, 'tasks.json');
 export const SCHEDULES_DB_PATH = path.join(CONFIG_DIR, 'schedules.json');
 export const SETTINGS_DB_PATH = path.join(CONFIG_DIR, 'settings.json');
+export const AUTH_DB_PATH = path.join(CONFIG_DIR, 'auth.json');
 
 export const SERVER_PORT = parseInt(process.env.PORT || '5800', 10);
-export const APP_USERNAME = process.env.APP_USERNAME || 'admin';
-export const APP_PASSWORD = process.env.APP_PASSWORD || '';
 export const PUID = process.env.PUID || '1000';
 export const PGID = process.env.PGID || '1000';
 

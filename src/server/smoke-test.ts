@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import fs from 'node:fs';
 import {
   buildRcloneProxyEnvAndArgs,
   calculateDirSize,
@@ -15,14 +16,89 @@ import {
 } from './rcloneService.js';
 import { taskManager } from './taskManager.js';
 import { schedulerService } from './schedulerService.js';
-import { APP_VERSION, ensureDirectoriesAndDefaults } from './config.js';
+import { APP_VERSION, AUTH_DB_PATH, ensureDirectoriesAndDefaults } from './config.js';
+import { authService, AuthError } from './authService.js';
 
 async function runSmokeTests() {
   console.log(`🧪 Starting RcloneBrowser Next Gen v${APP_VERSION} Integration Smoke Tests...`);
-  assert.strictEqual(APP_VERSION, '2.1', 'APP_VERSION should be loaded from version.json as 2.1');
+  assert.strictEqual(APP_VERSION, '2.2', 'APP_VERSION should be loaded from version.json as 2.2');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.77.0'), true, 'v1.77.0 > v1.76.0');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.76.0'), false, 'v1.76.0 == v1.76.0');
   ensureDirectoriesAndDefaults();
+
+  // 0. Verify v2.2 AuthService (initial console password, scrypt hash, forced change, rate limit, CLI reset)
+  const resetInfo = authService.resetPasswordCli();
+  assert.ok(
+    resetInfo.tempPassword.startsWith('RbN-'),
+    'Generated initial/temporary password should start with RbN-'
+  );
+  assert.ok(fs.existsSync(AUTH_DB_PATH), 'auth.json should exist on disk');
+  const rawAuthJson = fs.readFileSync(AUTH_DB_PATH, 'utf-8');
+  assert.ok(
+    !rawAuthJson.includes(resetInfo.tempPassword),
+    'Plaintext password must NEVER be stored in auth.json'
+  );
+
+  const initialLogin = authService.login('127.0.0.1', 'admin', resetInfo.tempPassword);
+  assert.strictEqual(
+    initialLogin.mustChangePassword,
+    true,
+    'First login with console temporary password must require password change'
+  );
+  assert.strictEqual(authService.isTokenValid(initialLogin.token), true, 'Initial token must be valid');
+
+  const updatedAuth = authService.updateSecurity({
+    currentPassword: resetInfo.tempPassword,
+    newUsername: 'admin',
+    newPassword: 'MyStrongNewPassword!2026',
+    authEnabled: true,
+  });
+  assert.strictEqual(updatedAuth.mustChangePassword, false, 'mustChangePassword should be false after update');
+  assert.strictEqual(
+    authService.isTokenValid(initialLogin.token),
+    false,
+    'Old token must be invalidated after password change'
+  );
+  assert.strictEqual(
+    authService.isTokenValid(updatedAuth.token),
+    true,
+    'New token returned by updateSecurity must be valid'
+  );
+
+  // Verify brute-force lockout after 5 failed attempts
+  const attackerIp = '10.99.88.77';
+  authService.clearRateLimits();
+  for (let i = 1; i <= 5; i++) {
+    let caughtError: AuthError | null = null;
+    try {
+      authService.login(attackerIp, 'admin', 'wrong-password');
+    } catch (err: any) {
+      caughtError = err;
+    }
+    assert.ok(caughtError instanceof AuthError, `Attempt ${i} should throw AuthError`);
+    if (i < 5) {
+      assert.strictEqual(caughtError!.statusCode, 401);
+    } else {
+      assert.strictEqual(caughtError!.statusCode, 429, '5th failed attempt should lock out IP with 429');
+    }
+  }
+  authService.clearRateLimits();
+
+  // Verify Passwordless Direct Mode toggle
+  const passwordlessState = authService.updateSecurity({
+    currentPassword: 'MyStrongNewPassword!2026',
+    authEnabled: false,
+  });
+  assert.strictEqual(passwordlessState.authRequired, false, 'Passwordless mode should disable authRequired');
+  assert.strictEqual(authService.isTokenValid(undefined), true, 'Token check passes in passwordless mode');
+
+  // Re-enable password protection
+  const reenabledState = authService.updateSecurity({
+    newPassword: 'MyStrongNewPassword!2026',
+    authEnabled: true,
+  });
+  assert.strictEqual(reenabledState.authRequired, true, 'Auth protection should be re-enabled');
+  console.log('✔ v2.2 AuthService (console password, scrypt hash, forced change, rate limit, LAN mode) verified.');
 
   // 1. Verify Rclone version detection
   const versionInfo = await getRcloneVersionInfo();

@@ -1,6 +1,6 @@
 {
   "name": "rclonebrowser-next-gen",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "RcloneBrowser Next Gen - Modern Native Web GUI for Rclone in Docker",
   "private": true,
   "type": "module",
@@ -10,6 +10,7 @@
     "dev:client": "vite",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
+    "reset-password": "node dist/server/reset-password.js",
     "test": "tsx src/server/smoke-test.ts"
   },
   "dependencies": {

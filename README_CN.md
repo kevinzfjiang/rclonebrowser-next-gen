@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀 (中文文档)
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.1-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.2-0284c7.svg)](./version.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
 > 📖 **语言切换 / Documentation**: **[English Documentation (README.md)](./README.md)** | **简体中文**
@@ -10,24 +10,25 @@
 
 彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
 
-- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.1`)
+- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.2`)
 - 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
 ## ✨ 为什么升级到 RcloneBrowser Next Gen？
 
-| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.1`)** |
+| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.2`)** |
 | :--- | :--- | :--- |
 | **交互体验** | 基于 X11/noVNC 远程桌面视频流，高延迟、字体发虚、移动端无法操作 | **原生响应式 Web 界面**，60fps 丝滑交互，内置 5 套主题风格与中/繁/英三语切换 |
 | **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译官方 Rclone + 轻量 Node.js 服务**，零 X11/Qt5 依赖，构建快速稳定 |
 | **资源占用** | 闲置内存 ~350MB - 500MB | **闲置内存 ~40MB** |
+| **安全机制** | VNC 弱口令或 Docker 环境变量明文密码暴露 | **Console 随机初始密码 + 首次登录强制改密 + `/config/auth.json` Scrypt 加盐哈希存储 + 防暴力破解锁定** |
 | **功能扩展** | 仅限桌面版基础窗口 | 内置 **双栏多标签 Commander、任务暂停/恢复、每个网盘独立代理、Cron 定时同步** |
 | **旧版兼容性** | `/config`、`/media`、端口 `5800` | **完全兼容**，启动时自动检测并迁移旧版 `/config/xdg/config/rclone/rclone.conf` |
 
 ---
 
-## 🛠️ 核心功能 (v2.1)
+## 🛠️ 核心功能 (v2.2)
 
 1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
    - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。
@@ -57,11 +58,56 @@
    - 在 Web 界面中配置周期性自动备份/同步任务（提供常用周期预设与自定义 5 段式 Cron 表达式）。
    - 支持随时启停、查看下次执行时间与历史状态，以及点击 **“立即运行一次”** 手动触发。
 
-5. **多主题风格、多语言与 Rclone 版本自动检查**
+5. **企业级密码与安全认证中心 (`v2.2`)**
+   - **彻底告别明文环境变量密码**：不再通过 `APP_PASSWORD` 环境变量暴露明文密码（防止 `docker inspect`、群晖面板或 `docker-compose.yml` 泄密）。
+   - **首次启动 Console 随机初始密码**：当 `/config/auth.json` 不存在时，容器自动生成高强度随机初始密码（如 `RbN-9kX4mP7vQ2wL`）并醒目打印在容器日志 (`docker logs`) 中。
+   - **首次登录强制修改密码**：使用初始密码登录后，系统强制弹出改密窗口，设置新密码后初始密码立即作废。
+   - **Scrypt 加盐哈希持久化**：密码仅以 `scrypt` + 随机盐值哈希形式保存在 `/config/auth.json`（权限 `0600`），磁盘上绝不保存任何明文密码。
+   - **Web 安全中心与免密直连开关**：随时点击顶部导航栏 **“安全中心”** 修改管理员账号/密码，或在受信任家庭内网中一键切换 **“免密直连模式”**。
+   - **防暴力破解与 CLI 一键重置**：同一 IP 连续输错 5 次密码自动锁定 5 分钟；内置命令行一键重置密码脚本。
+
+6. **多主题风格、多语言与 Rclone 版本自动检查**
    - **5 套界面主题**：`经典深色 (Slate)`、`浅色明亮 (Light)`、`赛博朋克 (Cyberpunk)`、`纯粹深黑 (OLED Black)`、`极地冰蓝 (Nord)`。
    - **3 种界面语言**：`简体中文`、`繁體中文`、`English`。
    - **Rclone 新版本自动检测**：后台自动对比官方最新 Rclone 版本，若有新版则在左下方状态栏醒目提示 `Rclone v1.76.0 / v1.77.0 (new)`。
    - **应用版本号配置化**：统一由根目录 [`version.json`](./version.json) 管理。
+
+---
+
+## 🔐 首次登录与密码管理指南 (v2.2+)
+
+### 1. 查看容器日志获取初始随机密码
+首次启动容器时，请在群晖 Container Manager「日志」页签或终端中执行：
+
+```bash
+docker logs rclonebrowser-next
+```
+
+你会在日志中看到如下初始凭证输出：
+```text
+============================================================
+🔐 [SECURITY] INITIAL ADMINISTRATOR CREDENTIALS GENERATED
+------------------------------------------------------------
+ 👤 Username         : admin
+ 🔑 Initial Password : RbN-9kX4mP7vQ2wL
+------------------------------------------------------------
+ ⚠️  Please sign in using the initial password above.
+ ⚠️  You will be required to change your password on first login.
+ 💾 Salted scrypt hash saved to: /config/auth.json
+============================================================
+```
+
+### 2. 首次登录强制改密 & 安全中心
+- 打开 `http://你的群晖IP:5800`，使用用户名 `admin` 和日志中的初始密码登录。
+- 登录后会自动弹出 **“首次登录 — 请修改初始管理员密码”** 窗口，设置你的专属密码（或者如果仅在家里内网使用，也可直接切换为 **“免密直连模式”**）。
+- 日后可随时点击右上角 **“安全中心”** 按钮修改用户名、更新密码或开关认证保护。
+
+### 3. 忘记密码如何重置？(Docker CLI 一键重置)
+如果不慎忘记管理员密码，只需在宿主机执行以下命令，即可生成并打印新的临时密码：
+
+```bash
+docker exec -it rclonebrowser-next node dist/server/reset-password.js
+```
 
 ---
 
@@ -89,9 +135,6 @@ services:
       - PORT=5800
       # 将多个本地挂载点注册为独立下拉存储源（在文件管理器下拉菜单一键直达）
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
-      # 可选：设置 Web 登录密码（留空则内网免密直接进入）
-      - APP_USERNAME=admin
-      - APP_PASSWORD=
     volumes:
       - /volume1/docker/rclonebrowser/config:/config
       - /volume3/NAS:/media/NAS
@@ -99,10 +142,11 @@ services:
       - /volume2/homes/kevin/Photos:/media/Photos
 ```
 
-启动命令：
+启动并查看初始密码：
 
 ```bash
 docker compose up -d
+docker logs rclonebrowser-next
 ```
 
 浏览器访问：`http://你的群晖IP:5800`
@@ -118,8 +162,6 @@ docker run -d \
   -e PUID=1000 \
   -e PGID=1000 \
   -e TZ=Asia/Shanghai \
-  -e APP_USERNAME=admin \
-  -e APP_PASSWORD=your_secret_password \
   -v /path/to/config:/config \
   -v /path/to/media:/media \
   --restart unless-stopped \
@@ -137,9 +179,7 @@ docker run -d \
 | `PGID` | `1000` | 运行进程的用户组 GID |
 | `TZ` | `Asia/Shanghai` | 容器时区（影响日志时间与 Cron 定时任务触发时间） |
 | `LOCAL_MOUNTS` | *(空)* | 额外多挂载点快捷注册，格式如：`NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos` |
-| `APP_USERNAME` | `admin` | Web 控制台登录用户名 |
-| `APP_PASSWORD` | *(空)* | Web 控制台登录密码。若留空则免密直接访问；若设置则强制要求登录 |
-| `CONFIG_DIR` | `/config` | 配置文件与任务数据持久化目录 |
+| `CONFIG_DIR` | `/config` | 配置文件、`auth.json` 与任务数据持久化目录 |
 | `MEDIA_DIR` | `/media` | 本地数据卷主挂载目录 |
 
 ---
@@ -152,17 +192,18 @@ docker run -d \
 git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
 cd rclonebrowser-next-gen
 
-docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.1 .
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.2 .
 docker push yadiman/rclonebrowser-next-gen:latest
-docker push yadiman/rclonebrowser-next-gen:2.1
+docker push yadiman/rclonebrowser-next-gen:2.2
 ```
 
 ### 2. 本地 Node.js 开发调试
 
 ```bash
 npm install
-npm run dev     # 同时启动后端 5800 与前端 Vite 热重载 5173
-npm run build   # 生产环境构建
-npm test        # 运行集成测试
-npm start       # 启动生产环境服务 (:5800)
+npm run dev             # 同时启动后端 5800 与前端 Vite 热重载 5173
+npm run build           # 生产环境构建
+npm test                # 运行集成测试（含 Rclone 与 AuthService 安全测试）
+npm run reset-password  # 重置管理员密码并输出新的临时密码
+npm start               # 启动生产环境服务 (:5800)
 ```
