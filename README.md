@@ -1,8 +1,14 @@
 # RcloneBrowser Next Gen 🚀
 
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
+
 **RcloneBrowser Next Gen** 是对传统 [kevinzfjiang/dockerfile/rclonebrowser](https://github.com/kevinzfjiang/dockerfile/blob/master/rclonebrowser/Dockerfile) 容器的彻底现代化重构。
 
 彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
+
+- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `1.0.0`)
+- 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
@@ -22,7 +28,7 @@
 
 1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
    - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。
-   - 内置本地数据卷 `@media` (`/media`) 与任意云端 Remote 同屏浏览。
+   - 内置本地数据卷 `@media` (`/media`)、多挂载点 (`LOCAL_MOUNTS`) 与任意云端 Remote 同屏浏览。
    - 支持 **拖拽上传文件**、**在线直接预览**（文本、代码、Markdown、JSON、图片、音视频）、文件流式下载、新建文件夹、重命名、批量删除、文件夹大小统计 (`rclone size`)。
    - 双栏一键 **复制到对侧 (`Copy →`)**、**移动到对侧 (`Move →`)**、**镜像同步目录 (`Sync ⇄`)**。
 2. **传输与同步任务中心 (`Transfers & Sync Center`)**
@@ -44,45 +50,53 @@
 
 ---
 
-## 🐳 Docker 快速部署
+## 🐳 Docker 快速部署指南
 
-### 方式一：使用 `docker-compose.yml` (推荐)
+镜像已发布至 Docker Hub：`yadiman/rclonebrowser-next-gen:latest`（同时提供 `yadiman/rclonebrowser-next-gen:1.0.0`）。
+
+### 场景一：群晖 NAS (Synology Container Manager) 多挂载点部署
+
+如果你在群晖上有多个跨存储池目录（例如 `/volume3/NAS`、`/volume1/NAS2`、`/volume2/homes/kevin/Photos`），推荐统一挂载到 `/media/` 子目录下，并配置 `LOCAL_MOUNTS` 环境变量以便在界面下拉框一键直达：
 
 ```yaml
 services:
   rclonebrowser:
-    build: .
-    image: rclonebrowser-next-gen:latest
+    image: yadiman/rclonebrowser-next-gen:latest
     container_name: rclonebrowser-next
     restart: unless-stopped
     ports:
       - "5800:5800"
     environment:
-      - PUID=1000
-      - PGID=1000
+      # 群晖默认首个管理员 UID=1026, GID=100 (可通过 SSH 执行 `id 用户名` 确认)
+      - PUID=1026
+      - PGID=100
       - TZ=Asia/Shanghai
       - PORT=5800
-      # 可选：设置 Web 登录密码，留空则免密直接进入
+      # 将多个本地挂载点注册为独立下拉存储源（在文件管理器下拉菜单一键直达）
+      - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
+      # 可选：设置 Web 登录密码（留空则内网免密直接进入）
       - APP_USERNAME=admin
       - APP_PASSWORD=
     volumes:
-      - ./config:/config
-      - ./media:/media
+      - /volume1/docker/rclonebrowser/config:/config
+      - /volume3/NAS:/media/NAS
+      - /volume1/NAS2:/media/NAS2
+      - /volume2/homes/kevin/Photos:/media/Photos
 ```
 
-启动容器：
+启动命令：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-浏览器访问：`http://localhost:5800`
+浏览器访问：`http://你的群晖IP:5800`
 
-### 方式二：使用 `docker run` 命令
+---
+
+### 场景二：通用 Linux 单目录快速启动 (`docker run`)
 
 ```bash
-docker build -t rclonebrowser-next-gen .
-
 docker run -d \
   --name=rclonebrowser-next \
   -p 5800:5800 \
@@ -94,7 +108,7 @@ docker run -d \
   -v /path/to/config:/config \
   -v /path/to/media:/media \
   --restart unless-stopped \
-  rclonebrowser-next-gen
+  yadiman/rclonebrowser-next-gen:latest
 ```
 
 ---
@@ -104,28 +118,43 @@ docker run -d \
 | 变量名 | 默认值 | 说明 |
 | :--- | :--- | :--- |
 | `PORT` | `5800` | Web GUI 监听端口（默认兼容旧版 `5800`） |
-| `PUID` | `1000` | 运行进程的用户 UID，解决挂载卷文件权限问题 |
-| `PGID` | `1000` | 运行进程的用户组 GID |
+| `PUID` | `1000` | 运行进程的用户 UID（群晖管理员通常为 `1026`），解决挂载卷文件权限问题 |
+| `PGID` | `1000` | 运行进程的用户组 GID（群晖 `users` 组通常为 `100`） |
 | `TZ` | `Asia/Shanghai` | 容器时区（影响日志时间与 Cron 定时任务触发时间） |
+| `LOCAL_MOUNTS` | *(空)* | 额外多挂载点快捷注册，格式如：`NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos` |
 | `APP_USERNAME` | `admin` | Web 控制台登录用户名 |
 | `APP_PASSWORD` | *(空)* | Web 控制台登录密码。若留空则免密直接访问；若设置则强制要求登录 |
 | `CONFIG_DIR` | `/config` | 配置文件与任务数据持久化目录 |
-| `MEDIA_DIR` | `/media` | 本地数据卷挂载目录 |
+| `MEDIA_DIR` | `/media` | 本地数据卷主挂载目录 |
 
 ---
 
-## 💻 本地开发与调试
+## 💻 从源码编译与本地开发
+
+### 1. 手动编译并推送 Docker 镜像
+
+```bash
+git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
+cd rclonebrowser-next-gen
+
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:1.0.0 .
+docker push yadiman/rclonebrowser-next-gen:latest
+docker push yadiman/rclonebrowser-next-gen:1.0.0
+```
+
+### 2. 本地 Node.js 开发调试
 
 本地需安装 `Node.js >= 20` 与 `rclone` CLI：
 
 ```bash
-# 1. 安装依赖
+# 安装依赖
 npm install
 
-# 2. 启动开发模式 (同时启动后端 5800 与前端 Vite 热重载 5173)
+# 启动开发模式 (同时启动后端 5800 与前端 Vite 热重载 5173)
 npm run dev
 
-# 3. 生产环境打包与启动
+# 生产环境打包与测试
 npm run build
+npm test
 npm start
 ```

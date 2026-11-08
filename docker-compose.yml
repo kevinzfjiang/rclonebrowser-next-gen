@@ -1,20 +1,17 @@
 services:
   rclonebrowser:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rclonebrowser-next-gen:latest
+    image: yadiman/rclonebrowser-next-gen:latest
     container_name: rclonebrowser-next
     restart: unless-stopped
     ports:
       - "5800:5800"
     environment:
-      # 群晖建议通过 ssh 执行 `id kevin` 查看实际 UID/GID (通常管理员为 1026:100)
+      # 群晖建议通过 ssh 执行 `id <用户名>` 查看实际 UID/GID (通常管理员为 1026:100，普通 Linux 为 1000:1000)
       - PUID=1026
       - PGID=100
       - TZ=Asia/Shanghai
       - PORT=5800
-      # 可选：将多个挂载点注册为独立下拉存储源（方便在下拉框一键直达）
+      # 可选：将多个挂载点注册为独立下拉存储源（方便在文件管理器下拉框一键直达）
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
       # 可选：设置 Web 登录用户名与密码（留空 APP_PASSWORD 则免密直接进入）
       - APP_USERNAME=admin
