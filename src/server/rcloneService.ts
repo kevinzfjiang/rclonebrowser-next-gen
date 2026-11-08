@@ -118,11 +118,13 @@ export function parseRcloneConf(rawText: string): RemoteInfo[] {
     const sectionMatch = line.match(/^\[([^\]]+)\]$/);
     if (sectionMatch) {
       if (currentName) {
+        const proxyVal = (currentParams._proxy_url || currentParams.proxy_url || '').trim();
         remotes.push({
           name: currentName,
           type: currentParams.type || 'unknown',
           params: { ...currentParams },
           isLocalMedia: currentName === 'local_media',
+          proxyUrl: proxyVal || undefined,
         });
       }
       currentName = sectionMatch[1].trim();
@@ -141,15 +143,94 @@ export function parseRcloneConf(rawText: string): RemoteInfo[] {
   }
 
   if (currentName) {
+    const proxyVal = (currentParams._proxy_url || currentParams.proxy_url || '').trim();
     remotes.push({
       name: currentName,
       type: currentParams.type || 'unknown',
       params: { ...currentParams },
       isLocalMedia: currentName === 'local_media',
+      proxyUrl: proxyVal || undefined,
     });
   }
 
   return remotes;
+}
+
+/**
+ * Resolve the configured proxy URL for a given remote name.
+ * If the remote is a wrapper (e.g. crypt or alias pointing to baseRemote:path) and doesn't
+ * define its own _proxy_url, it inherits the base remote's proxy automatically.
+ */
+export function getRemoteProxyUrl(remoteName: string, visited = new Set<string>()): string {
+  const cleanName = remoteName.replace(/:$/, '').trim();
+  if (!cleanName || cleanName.startsWith('@') || cleanName === 'local_media') {
+    return '';
+  }
+  if (visited.has(cleanName)) return '';
+  visited.add(cleanName);
+
+  const remotes = parseRcloneConf(getRawConfig());
+  const found = remotes.find((r) => r.name === cleanName);
+  if (!found) return '';
+
+  const directProxy = (found.params._proxy_url || found.params.proxy_url || '').trim();
+  if (directProxy) {
+    return directProxy;
+  }
+
+  // Check if wrapper remote (crypt / alias) references another remote
+  const wrappedTarget = (found.params.remote || '').trim();
+  if (wrappedTarget && wrappedTarget.includes(':')) {
+    const baseRemote = wrappedTarget.split(':')[0].trim();
+    if (baseRemote && !baseRemote.startsWith('/')) {
+      return getRemoteProxyUrl(baseRemote, visited);
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Build child_process env and extra rclone CLI flags for a specific proxy URL.
+ * When proxyUrl is empty, explicitly strips global HTTP_PROXY / HTTPS_PROXY / ALL_PROXY
+ * so "No Proxy (Direct)" remotes like OneDrive are never hijacked by host env vars.
+ */
+export function buildRcloneProxyEnvAndArgs(proxyUrl?: string): {
+  env: NodeJS.ProcessEnv;
+  extraArgs: string[];
+} {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const cleanProxy = (proxyUrl || '').trim();
+
+  if (cleanProxy) {
+    env.HTTP_PROXY = cleanProxy;
+    env.HTTPS_PROXY = cleanProxy;
+    env.ALL_PROXY = cleanProxy;
+    env.http_proxy = cleanProxy;
+    env.https_proxy = cleanProxy;
+    env.all_proxy = cleanProxy;
+    env.NO_PROXY = '127.0.0.1,localhost';
+    env.no_proxy = '127.0.0.1,localhost';
+    return {
+      env,
+      extraArgs: ['--http-proxy', cleanProxy],
+    };
+  }
+
+  // Explicitly clear proxy variables for Direct / No-Proxy execution
+  delete env.HTTP_PROXY;
+  delete env.HTTPS_PROXY;
+  delete env.ALL_PROXY;
+  delete env.http_proxy;
+  delete env.https_proxy;
+  delete env.all_proxy;
+  env.NO_PROXY = '127.0.0.1,localhost';
+  env.no_proxy = '127.0.0.1,localhost';
+
+  return {
+    env,
+    extraArgs: [],
+  };
 }
 
 export function serializeRcloneConf(remotes: RemoteInfo[]): string {
@@ -235,8 +316,8 @@ export async function upsertRemote(
   obscurePasswords = true
 ): Promise<RemoteInfo[]> {
   const cleanName = name.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  if (!cleanName || cleanName === '@media') {
-    throw new Error('Remote 名称无效或为系统保留名称 (@media)');
+  if (!cleanName || cleanName.startsWith('@')) {
+    throw new Error('Remote 名称无效或为系统保留名称');
   }
 
   const raw = getRawConfig();
@@ -244,6 +325,18 @@ export async function upsertRemote(
   const existing = existingRemotes.find((r) => r.name === cleanName);
 
   const finalParams: RemoteConfigParams = { ...params, type };
+  // Normalize proxy key to _proxy_url
+  if (finalParams.proxy_url !== undefined) {
+    finalParams._proxy_url = finalParams.proxy_url.trim();
+    delete finalParams.proxy_url;
+  }
+  if (finalParams._proxy_url !== undefined) {
+    finalParams._proxy_url = finalParams._proxy_url.trim();
+    if (!finalParams._proxy_url) {
+      delete finalParams._proxy_url;
+    }
+  }
+
   const obscureKeys = OBSCURE_KEYS_BY_TYPE[type] || [];
 
   if (obscurePasswords) {
@@ -259,6 +352,7 @@ export async function upsertRemote(
     name: cleanName,
     type,
     params: finalParams,
+    proxyUrl: finalParams._proxy_url || undefined,
   };
 
   const idx = existingRemotes.findIndex((r) => r.name === cleanName);
@@ -273,8 +367,8 @@ export async function upsertRemote(
 }
 
 export function deleteRemote(name: string): RemoteInfo[] {
-  if (name === '@media') {
-    throw new Error('内置本地媒体卷 (@media) 不可删除');
+  if (name.startsWith('@')) {
+    throw new Error('内置本地挂载点不可删除');
   }
   const raw = getRawConfig();
   const existingRemotes = parseRcloneConf(raw).filter((r) => r.name !== name);
@@ -355,11 +449,13 @@ export async function listDirectory(remoteName: string, relPath: string): Promis
     });
   }
 
-  // Use rclone lsjson for remote paths
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
+
   const { stdout } = await execFileAsync(
     'rclone',
-    ['lsjson', '--config', RCLONE_CONFIG_PATH, target.rcloneSpec],
-    { timeout: 30000, maxBuffer: 25 * 1024 * 1024 }
+    ['lsjson', '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+    { timeout: 30000, maxBuffer: 25 * 1024 * 1024, env }
   );
 
   const parsed: FileEntry[] = JSON.parse(stdout || '[]');
@@ -382,9 +478,13 @@ export async function makeDirectory(remoteName: string, relPath: string): Promis
     await fs.promises.mkdir(target.localFullPath, { recursive: true });
     return;
   }
-  await execFileAsync('rclone', ['mkdir', '--config', RCLONE_CONFIG_PATH, target.rcloneSpec], {
-    timeout: 20000,
-  });
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
+  await execFileAsync(
+    'rclone',
+    ['mkdir', '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+    { timeout: 20000, env }
+  );
 }
 
 export async function deleteEntry(remoteName: string, relPath: string, isDir: boolean): Promise<void> {
@@ -397,10 +497,14 @@ export async function deleteEntry(remoteName: string, relPath: string, isDir: bo
     await fs.promises.rm(target.localFullPath, { recursive: true, force: true });
     return;
   }
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
   const subcommand = isDir ? 'purge' : 'deletefile';
-  await execFileAsync('rclone', [subcommand, '--config', RCLONE_CONFIG_PATH, target.rcloneSpec], {
-    timeout: 60000,
-  });
+  await execFileAsync(
+    'rclone',
+    [subcommand, '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+    { timeout: 60000, env }
+  );
 }
 
 export async function renameEntry(
@@ -417,20 +521,25 @@ export async function renameEntry(
     return;
   }
 
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
+
   await execFileAsync(
     'rclone',
-    ['moveto', '--config', RCLONE_CONFIG_PATH, srcTarget.rcloneSpec, dstTarget.rcloneSpec],
-    { timeout: 60000 }
+    ['moveto', '--config', RCLONE_CONFIG_PATH, ...extraArgs, srcTarget.rcloneSpec, dstTarget.rcloneSpec],
+    { timeout: 60000, env }
   );
 }
 
 export async function getStorageQuota(remoteName: string): Promise<StorageQuota> {
   const target = resolveRcloneTarget(remoteName, '');
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
   try {
     const { stdout } = await execFileAsync(
       'rclone',
-      ['about', '--json', '--config', RCLONE_CONFIG_PATH, target.rcloneSpec],
-      { timeout: 15000 }
+      ['about', '--json', '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+      { timeout: 15000, env }
     );
     const data = JSON.parse(stdout || '{}');
     return {
@@ -451,10 +560,12 @@ export async function calculateDirSize(
   relPath: string
 ): Promise<{ count: number; bytes: number }> {
   const target = resolveRcloneTarget(remoteName, relPath);
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
   const { stdout } = await execFileAsync(
     'rclone',
-    ['size', '--json', '--config', RCLONE_CONFIG_PATH, target.rcloneSpec],
-    { timeout: 45000 }
+    ['size', '--json', '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+    { timeout: 45000, env }
   );
   const data = JSON.parse(stdout || '{"count":0,"bytes":0}');
   return {
@@ -468,6 +579,9 @@ export async function uploadLocalFilesToRemote(
   destDirRelPath: string,
   files: { tempPath: string; originalName: string }[]
 ): Promise<void> {
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
+
   for (const file of files) {
     const destItemRel = sanitizeRelPath(
       destDirRelPath ? `${destDirRelPath}/${file.originalName}` : file.originalName
@@ -481,8 +595,8 @@ export async function uploadLocalFilesToRemote(
       } else {
         await execFileAsync(
           'rclone',
-          ['copyto', '--config', RCLONE_CONFIG_PATH, file.tempPath, target.rcloneSpec],
-          { timeout: 300000 }
+          ['copyto', '--config', RCLONE_CONFIG_PATH, ...extraArgs, file.tempPath, target.rcloneSpec],
+          { timeout: 300000, env }
         );
       }
     } finally {
@@ -514,9 +628,17 @@ export function createFileReadStream(remoteName: string, relPath: string): {
     return { mimeType, fileName, stream };
   }
 
-  const child = spawn('rclone', ['cat', '--config', RCLONE_CONFIG_PATH, target.rcloneSpec], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const proxyUrl = getRemoteProxyUrl(remoteName);
+  const { env, extraArgs } = buildRcloneProxyEnvAndArgs(proxyUrl);
+
+  const child = spawn(
+    'rclone',
+    ['cat', '--config', RCLONE_CONFIG_PATH, ...extraArgs, target.rcloneSpec],
+    {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env,
+    }
+  );
 
   return {
     mimeType,

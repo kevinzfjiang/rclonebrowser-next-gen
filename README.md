@@ -35,13 +35,16 @@
    - 支持 `Copy`、`Sync`、`Move`、`Check` 异步任务队列。
    - 解析 `rclone --use-json-log --stats 500ms` 实时流，展示 **总体进度条、实时传输速率 (MB/s)、剩余时间 (ETA)、正在传输的子文件列表**。
    - 支持随时调整 **全局带宽限速 (`--bwlimit`)**、取消运行中任务、失败重试，以及展开查看 **Rclone 实时终端日志**。
-3. **可视化 Remote 存储源管理 (`Remotes & Config`)**
+3. **可视化 Remote 存储源管理 & 独立代理绑定 (`Remotes & Per-Remote Proxy`)**
+   - **支持每个 Remote 独立绑定代理或直连**：
+     - 完美解决中国大陆环境下不同网盘需要不同网络出口的痛点（例如：`Google Drive A` 绑定 `socks5://192.168.1.2:1080`，`Google Drive B` 绑定 `http://192.168.1.2:7890`，`OneDrive` / 阿里云盘 / 本地 NAS 保持 `直连无代理`）。
+     - 即使在两个配置了**不同代理**（或一个走代理、一个走直连）的网盘之间直接对传，系统也会自动启动**双进程本地回环桥接 (`127.0.0.1`)**，确保源端和目标端各自严格走自己的代理通道，互不干扰！
    - 内置主流存储协议可视化创建/编辑向导：
      - **S3 兼容对象存储**（AWS S3、Cloudflare R2、MinIO、阿里云 OSS、腾讯云 COS、Backblaze B2）
      - **WebDAV**（Alist、OpenList、Nextcloud、OwnCloud、群晖 NAS）
      - **SFTP / SSH**、**SMB / CIFS 局域网共享**、**FTP**
      - **Google Drive**、**Microsoft OneDrive**（含世纪互联版）
-     - **Alias 本地/远端路径映射**、**Crypt 端到端加密层**
+     - **Alias 本地/远端路径映射**、**Crypt 端到端加密层**（自动继承底层 Remote 的代理配置）
    - 保存时自动调用 `rclone obscure` 对明文密码进行安全加密。
    - 内置 **`rclone.conf` 源文件在线编辑器**，支持一键导入/导出备份配置文件，以及 `rclone about` 容量测速。
 4. **Cron 定时同步调度器 (`Cron Scheduler`)**

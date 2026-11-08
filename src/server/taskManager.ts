@@ -1,8 +1,13 @@
 import { ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import net from 'node:net';
 import { RCLONE_CONFIG_PATH, SETTINGS_DB_PATH, TASKS_DB_PATH } from './config.js';
-import { resolveRcloneTarget } from './rcloneService.js';
+import {
+  buildRcloneProxyEnvAndArgs,
+  getRemoteProxyUrl,
+  resolveRcloneTarget,
+} from './rcloneService.js';
 import {
   TransferOperation,
   TransferOptions,
@@ -17,9 +22,46 @@ interface ServerSettings {
   maxConcurrentTasks: number;
 }
 
+function getFreeLocalPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      srv.close((err) => {
+        if (err || !port) reject(err || new Error('Failed to allocate port'));
+        else resolve(port);
+      });
+    });
+    srv.on('error', reject);
+  });
+}
+
+function waitForLocalPort(port: number, timeoutMs = 5000): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tryConnect = () => {
+      const sock = net.createConnection({ host: '127.0.0.1', port });
+      sock.once('connect', () => {
+        sock.destroy();
+        resolve();
+      });
+      sock.once('error', () => {
+        sock.destroy();
+        if (Date.now() - start >= timeoutMs) {
+          reject(new Error(`本地代理桥接端口 127.0.0.1:${port} 启动超时`));
+        } else {
+          setTimeout(tryConnect, 120);
+        }
+      });
+    };
+    tryConnect();
+  });
+}
+
 class TaskManager {
   private tasks: TransferTask[] = [];
-  private activeProcesses = new Map<string, ChildProcess>();
+  private activeProcesses = new Map<string, ChildProcess[]>();
   private settings: ServerSettings = {
     globalBwLimit: 'off',
     maxConcurrentTasks: 3,
@@ -161,6 +203,20 @@ class TaskManager {
     return task;
   }
 
+  private killTaskProcesses(id: string): void {
+    const procs = this.activeProcesses.get(id);
+    if (procs) {
+      for (const p of procs) {
+        try {
+          if (!p.killed) p.kill('SIGTERM');
+        } catch {
+          // Ignore
+        }
+      }
+      this.activeProcesses.delete(id);
+    }
+  }
+
   public cancelTask(id: string): TransferTask {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) {
@@ -174,16 +230,14 @@ class TaskManager {
       return task;
     }
 
-    const proc = this.activeProcesses.get(id);
-    if (proc) {
+    if (this.activeProcesses.has(id)) {
       task.status = 'cancelled';
       task.speed = 0;
       task.eta = null;
       task.activeFiles = [];
       task.completedAt = new Date().toISOString();
       task.logs.push(`[${new Date().toLocaleTimeString()}] 正在终止 Rclone 进程...`);
-      proc.kill('SIGTERM');
-      this.activeProcesses.delete(id);
+      this.killTaskProcesses(id);
       this.saveState();
       this.processQueue();
     }
@@ -240,23 +294,105 @@ class TaskManager {
 
     if (!nextQueued) return;
 
-    this.executeRcloneTask(nextQueued);
-    // Check if more slots available
+    this.executeRcloneTask(nextQueued).catch((err) => {
+      nextQueued.status = 'failed';
+      nextQueued.error = err.message;
+      nextQueued.completedAt = new Date().toISOString();
+      this.appendLog(nextQueued, `[ERROR] ${err.message}`);
+      this.saveState();
+      this.processQueue();
+    });
+
     if (this.activeProcesses.size < this.settings.maxConcurrentTasks) {
       this.processQueue();
     }
   }
 
-  private executeRcloneTask(task: TransferTask): void {
+  private async executeRcloneTask(task: TransferTask): Promise<void> {
     task.status = 'running';
     task.startedAt = new Date().toISOString();
 
     const srcTarget = resolveRcloneTarget(task.srcRemote, task.srcPath);
     const dstTarget = resolveRcloneTarget(task.dstRemote, task.dstPath);
 
+    const srcProxy = getRemoteProxyUrl(task.srcRemote);
+    const dstProxy = getRemoteProxyUrl(task.dstRemote);
+
+    const managedProcs: ChildProcess[] = [];
+    this.activeProcesses.set(task.id, managedProcs);
+
+    let effectiveSrcSpec = srcTarget.rcloneSpec;
+    let mainProxyUrl = '';
+    const extraMainArgs: string[] = [];
+
+    // Determine proxy strategy:
+    // 1. If src is local, only dst needs network -> use dstProxy
+    // 2. If dst is local, only src needs network -> use srcProxy
+    // 3. If both are remote and share the same proxy (or both empty) -> use srcProxy
+    // 4. If both are remote and have DIFFERENT proxy settings (e.g. GDrive A [Proxy A] -> GDrive B [Proxy B] or OneDrive [No Proxy]):
+    //    Spawn an isolated local WebDAV loopback bridge for srcRemote with srcProxy, and run main transfer with dstProxy!
+    if (srcTarget.isDirectLocal) {
+      mainProxyUrl = dstProxy;
+      this.appendLog(
+        task,
+        `[PROXY] 本地源 → 远端 (${task.dstRemote}) 代理: ${dstProxy || '直连 (无代理)'}`
+      );
+    } else if (dstTarget.isDirectLocal) {
+      mainProxyUrl = srcProxy;
+      this.appendLog(
+        task,
+        `[PROXY] 远端 (${task.srcRemote}) → 本地目标 代理: ${srcProxy || '直连 (无代理)'}`
+      );
+    } else if (srcProxy === dstProxy) {
+      mainProxyUrl = srcProxy;
+      this.appendLog(
+        task,
+        `[PROXY] 源端与目标端统一代理策略: ${srcProxy || '直连 (无代理)'}`
+      );
+    } else {
+      // Isolated Dual-Proxy Bridge Mode!
+      const bridgePort = await getFreeLocalPort();
+      const srcProxyConfig = buildRcloneProxyEnvAndArgs(srcProxy);
+      const bridgeArgs = [
+        'serve',
+        'webdav',
+        srcTarget.rcloneSpec,
+        '--addr',
+        `127.0.0.1:${bridgePort}`,
+        '--config',
+        RCLONE_CONFIG_PATH,
+        ...srcProxyConfig.extraArgs,
+      ];
+
+      this.appendLog(
+        task,
+        `[PROXY] 检测到跨存储独立代理策略！源 [${task.srcRemote}]: ${
+          srcProxy || '直连'
+        } | 目标 [${task.dstRemote}]: ${dstProxy || '直连'}`
+      );
+      this.appendLog(
+        task,
+        `[PROXY] 启动源端独立代理桥接服务 (127.0.0.1:${bridgePort})...`
+      );
+
+      const bridgeProc = spawn('rclone', bridgeArgs, {
+        stdio: ['ignore', 'ignore', 'pipe'],
+        env: srcProxyConfig.env,
+      });
+      managedProcs.push(bridgeProc);
+
+      await waitForLocalPort(bridgePort, 6000);
+
+      effectiveSrcSpec = ':webdav:';
+      extraMainArgs.push('--webdav-url', `http://127.0.0.1:${bridgePort}`);
+      mainProxyUrl = dstProxy;
+    }
+
+    const mainProxyConfig = buildRcloneProxyEnvAndArgs(mainProxyUrl);
+
     const args: string[] = [
       task.operation,
-      srcTarget.rcloneSpec,
+      effectiveSrcSpec,
       dstTarget.rcloneSpec,
       '--config',
       RCLONE_CONFIG_PATH,
@@ -264,6 +400,8 @@ class TaskManager {
       '--stats',
       '500ms',
       '-v',
+      ...mainProxyConfig.extraArgs,
+      ...extraMainArgs,
     ];
 
     if (task.options.dryRun) {
@@ -307,9 +445,10 @@ class TaskManager {
 
     const child = spawn('rclone', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: mainProxyConfig.env,
     });
 
-    this.activeProcesses.set(task.id, child);
+    managedProcs.push(child);
 
     let stderrBuffer = '';
 
@@ -352,7 +491,6 @@ class TaskManager {
           const level = (parsed.level || 'info').toUpperCase();
           const objPrefix = parsed.object ? `[${parsed.object}] ` : '';
           const msgClean = String(parsed.msg).trim();
-          // Skip noisy empty stat lines
           if (!msgClean.startsWith('Transferred:')) {
             this.appendLog(task, `[${level}] ${objPrefix}${msgClean}`);
           }
@@ -382,7 +520,7 @@ class TaskManager {
     });
 
     child.on('error', (err) => {
-      this.activeProcesses.delete(task.id);
+      this.killTaskProcesses(task.id);
       task.status = 'failed';
       task.speed = 0;
       task.eta = null;
@@ -399,7 +537,7 @@ class TaskManager {
       if (stderrBuffer.trim()) {
         handleLine(stderrBuffer);
       }
-      this.activeProcesses.delete(task.id);
+      this.killTaskProcesses(task.id);
 
       if (task.status === 'cancelled') {
         this.appendLog(task, `[CANCELLED] 任务已取消`);

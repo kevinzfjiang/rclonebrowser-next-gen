@@ -478,7 +478,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
                   ? '💾 本地存储 (/media)'
                   : r.name.startsWith('@')
                     ? `💾 挂载点: ${r.name.slice(1)} (${r.rootPath || ''})`
-                    : `☁️ ${r.name}: (${r.type.toUpperCase()})`}
+                    : `☁️ ${r.name}: (${r.type.toUpperCase()})${
+                        r.proxyUrl || r.params._proxy_url ? ' [🌐代理]' : ''
+                      }`}
               </option>
             ))}
           </select>

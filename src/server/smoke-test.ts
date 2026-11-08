@@ -1,8 +1,10 @@
 import assert from 'node:assert';
 import {
+  buildRcloneProxyEnvAndArgs,
   calculateDirSize,
   deleteRemote,
   getRcloneVersionInfo,
+  getRemoteProxyUrl,
   listDirectory,
   listRemotes,
   makeDirectory,
@@ -29,12 +31,22 @@ async function runSmokeTests() {
 
   const afterAdd = await upsertRemote('test_backup_alias', 'alias', {
     remote: initialRemotes[0].rootPath || './data/media',
+    _proxy_url: 'socks5://127.0.0.1:1080',
   });
   assert.ok(
-    afterAdd.some((r) => r.name === 'test_backup_alias'),
-    'Newly added alias remote should exist'
+    afterAdd.some((r) => r.name === 'test_backup_alias' && r.proxyUrl === 'socks5://127.0.0.1:1080'),
+    'Newly added alias remote with per-remote proxy should exist'
   );
-  console.log('✔ Remote upsert verified. Total remotes:', afterAdd.length);
+  assert.strictEqual(
+    getRemoteProxyUrl('test_backup_alias'),
+    'socks5://127.0.0.1:1080',
+    'getRemoteProxyUrl should return configured proxy'
+  );
+  const proxyEnv = buildRcloneProxyEnvAndArgs('http://192.168.1.2:7890');
+  assert.strictEqual(proxyEnv.env.HTTP_PROXY, 'http://192.168.1.2:7890');
+  const directEnv = buildRcloneProxyEnvAndArgs('');
+  assert.strictEqual(directEnv.env.HTTP_PROXY, undefined);
+  console.log('✔ Remote upsert & per-remote proxy resolution verified. Total remotes:', afterAdd.length);
 
   // 3. Verify Directory Listing, Mkdir, Rename, Size, Delete
   await makeDirectory('@media', 'SmokeTestFolder');

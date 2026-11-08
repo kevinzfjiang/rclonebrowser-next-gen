@@ -1,23 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  CheckCircle2,
   Cloud,
   Code2,
   Download,
   Edit3,
-  ExternalLink,
   FolderOpen,
+  Globe,
   HardDrive,
-  KeyRound,
   Loader2,
   Lock,
   Plus,
   RefreshCw,
   Save,
-  Server,
   Trash2,
   Upload,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   RemoteConfigParams,
@@ -60,6 +58,8 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
   const [selectedType, setSelectedType] = useState<string>('s3');
   const [remoteName, setRemoteName] = useState('');
   const [formParams, setFormParams] = useState<RemoteConfigParams>({});
+  const [proxyMode, setProxyMode] = useState<'direct' | 'http' | 'socks5'>('direct');
+  const [proxyUrlInput, setProxyUrlInput] = useState<string>('');
   const [customKV, setCustomKV] = useState<{ key: string; value: string }[]>([]);
   const [obscurePasswords, setObscurePasswords] = useState(true);
   const [savingRemote, setSavingRemote] = useState(false);
@@ -114,6 +114,8 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setSelectedType(defaultType);
     setRemoteName('');
     setFormParams(defaults);
+    setProxyMode('direct');
+    setProxyUrlInput('');
     setCustomKV([]);
     setObscurePasswords(true);
     setShowWizard(true);
@@ -123,12 +125,14 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     const tpl = templates.find((t) => t.type === remote.type);
     const knownKeys = new Set(tpl?.fields.map((f) => f.key) || []);
     knownKeys.add('type');
+    knownKeys.add('_proxy_url');
+    knownKeys.add('proxy_url');
 
     const baseParams: RemoteConfigParams = {};
     const extras: { key: string; value: string }[] = [];
 
     for (const [k, v] of Object.entries(remote.params)) {
-      if (k === 'type') continue;
+      if (k === 'type' || k === '_proxy_url' || k === 'proxy_url') continue;
       if (knownKeys.has(k)) {
         baseParams[k] = v;
       } else {
@@ -136,12 +140,24 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
       }
     }
 
+    const existingProxy = (remote.proxyUrl || remote.params._proxy_url || remote.params.proxy_url || '').trim();
+    if (!existingProxy) {
+      setProxyMode('direct');
+      setProxyUrlInput('');
+    } else if (existingProxy.startsWith('socks')) {
+      setProxyMode('socks5');
+      setProxyUrlInput(existingProxy);
+    } else {
+      setProxyMode('http');
+      setProxyUrlInput(existingProxy);
+    }
+
     setEditingMode(true);
     setSelectedType(remote.type);
     setRemoteName(remote.name);
     setFormParams(baseParams);
     setCustomKV(extras);
-    setObscurePasswords(false); // Existing passwords in rclone.conf are already obscured unless modified
+    setObscurePasswords(false);
     setShowWizard(true);
   };
 
@@ -159,6 +175,21 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setFormParams(defaults);
   };
 
+  const handleProxyModeChange = (mode: 'direct' | 'http' | 'socks5') => {
+    setProxyMode(mode);
+    if (mode === 'direct') {
+      setProxyUrlInput('');
+    } else if (mode === 'http') {
+      if (!proxyUrlInput || proxyUrlInput.startsWith('socks')) {
+        setProxyUrlInput('http://192.168.1.2:7890');
+      }
+    } else if (mode === 'socks5') {
+      if (!proxyUrlInput || proxyUrlInput.startsWith('http')) {
+        setProxyUrlInput('socks5://192.168.1.2:1080');
+      }
+    }
+  };
+
   const handleSaveRemote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!remoteName.trim()) {
@@ -171,6 +202,12 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
       if (item.key.trim()) {
         mergedParams[item.key.trim()] = item.value.trim();
       }
+    }
+
+    if (proxyMode !== 'direct' && proxyUrlInput.trim()) {
+      mergedParams._proxy_url = proxyUrlInput.trim();
+    } else {
+      mergedParams._proxy_url = '';
     }
 
     setSavingRemote(true);
@@ -273,7 +310,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
 
         {subTab === 'cards' && (
           <button
-            onClick={() => openCreateWizard('s3')}
+            onClick={() => openCreateWizard('drive')}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-lg shadow-sky-600/20"
           >
             <Plus className="w-4 h-4" />
@@ -290,6 +327,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
             {remotes.map((r) => {
               const q = quotas[r.name];
               const isBuiltin = r.name.startsWith('@');
+              const proxyVal = r.proxyUrl || r.params._proxy_url || r.params.proxy_url;
 
               return (
                 <div
@@ -298,9 +336,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          className={`p-2.5 rounded-xl ${
+                          className={`p-2.5 rounded-xl shrink-0 ${
                             isBuiltin
                               ? 'bg-emerald-500/15 text-emerald-400'
                               : r.type === 'crypt'
@@ -316,9 +354,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                             <Cloud className="w-5 h-5" />
                           )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-slate-100">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm font-bold text-slate-100 truncate">
                               {r.name === '@media'
                                 ? '本地数据卷 (/media)'
                                 : isBuiltin
@@ -329,7 +367,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                               {r.type}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <p className="text-xs text-slate-400 mt-0.5 truncate">
                             {isBuiltin
                               ? `容器挂载路径: ${r.rootPath || '/media'}`
                               : r.params.endpoint ||
@@ -343,10 +381,35 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                       </div>
                     </div>
 
+                    {/* Per-Remote Proxy Badge */}
+                    {!isBuiltin && (
+                      <div
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs ${
+                          proxyVal
+                            ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-200'
+                            : 'bg-slate-950/60 border-slate-800/80 text-slate-400'
+                        }`}
+                      >
+                        {proxyVal ? (
+                          <>
+                            <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="font-mono truncate" title={proxyVal}>
+                              独立代理: {proxyVal}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>网络策略: 直连 (无代理)</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     {/* Key parameters summary */}
                     <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2.5 space-y-1 font-mono text-[11px]">
                       {Object.entries(r.params)
-                        .filter(([k]) => k !== 'type')
+                        .filter(([k]) => k !== 'type' && k !== '_proxy_url' && k !== 'proxy_url')
                         .slice(0, 4)
                         .map(([k, v]) => {
                           const isSecret =
@@ -362,9 +425,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                             </div>
                           );
                         })}
-                      {Object.keys(r.params).length <= 1 && (
-                        <div className="text-slate-500">默认参数配置</div>
-                      )}
+                      {Object.keys(r.params).filter(
+                        (k) => k !== 'type' && k !== '_proxy_url' && k !== 'proxy_url'
+                      ).length === 0 && <div className="text-slate-500">默认参数配置</div>}
                     </div>
 
                     {/* Quota Display if loaded */}
@@ -407,7 +470,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                         <>
                           <button
                             onClick={() => openEditWizard(r)}
-                            title="编辑此 Remote"
+                            title="编辑此 Remote 与代理设置"
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
@@ -431,7 +494,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
           {/* Quick Templates Showcase */}
           <div className="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 space-y-3">
             <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              快速添加主流云存储与协议向导
+              快速添加主流云存储与协议向导（支持为每个存储单独绑定 HTTP / SOCKS5 代理）
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {templates.map((tpl) => (
@@ -463,6 +526,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
               <code className="text-sky-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
                 {rawPath || '/config/rclone/rclone.conf'}
               </code>
+              <span className="ml-3 text-slate-500">
+                (提示: 可在任意段落添加 <code className="text-indigo-300">_proxy_url = socks5://ip:port</code> 绑定独立代理)
+              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -528,7 +594,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <form
             onSubmit={handleSaveRemote}
-            className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[88vh]"
+            className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
           >
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-100">
@@ -556,7 +622,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     disabled={editingMode}
                     value={remoteName}
                     onChange={(e) => setRemoteName(e.target.value)}
-                    placeholder="例如: my_s3, alist_nas, gdrive"
+                    placeholder="例如: gdrive_a, gdrive_b, onedrive"
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 font-mono disabled:opacity-60"
                   />
                 </div>
@@ -577,6 +643,85 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Dedicated Per-Remote Proxy Configuration Card */}
+              <div className="p-4 rounded-xl bg-indigo-950/25 border border-indigo-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-indigo-400" />
+                    <span className="font-semibold text-indigo-200">
+                      独立网络代理设置 (Per-Remote Proxy)
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-indigo-300/80">
+                    仅对该 Remote 生效，互不干扰
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleProxyModeChange('direct')}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                      proxyMode === 'direct'
+                        ? 'bg-emerald-600/25 border-emerald-500 text-emerald-200'
+                        : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>直连 (无代理)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleProxyModeChange('http')}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                      proxyMode === 'http'
+                        ? 'bg-indigo-600/30 border-indigo-400 text-indigo-100'
+                        : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>HTTP / HTTPS 代理</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleProxyModeChange('socks5')}
+                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                      proxyMode === 'socks5'
+                        ? 'bg-sky-600/30 border-sky-400 text-sky-100'
+                        : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>SOCKS5 代理</span>
+                  </button>
+                </div>
+
+                {proxyMode !== 'direct' && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block text-slate-300 font-medium">
+                      代理服务器地址 (支持带账号密码认证)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={proxyUrlInput}
+                      onChange={(e) => setProxyUrlInput(e.target.value)}
+                      placeholder={
+                        proxyMode === 'socks5'
+                          ? 'socks5://192.168.1.2:1080 或 socks5://user:pass@192.168.1.2:1080'
+                          : 'http://192.168.1.2:7890 或 http://user:pass@192.168.1.2:7890'
+                      }
+                      className="w-full bg-slate-950 border border-indigo-500/50 rounded-lg px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-indigo-400"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      例如：Google Drive A 可设为 <code className="text-indigo-300">socks5://192.168.1.2:1080</code>，Google Drive B 设为 <code className="text-indigo-300">http://192.168.1.2:7890</code>，OneDrive 选择“直连”。即使在不同代理的网盘之间直接对传，系统也会自动启动双进程隔离桥接。
+                    </p>
+                  </div>
+                )}
               </div>
 
               {activeTemplate && (

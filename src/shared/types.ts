@@ -12,6 +12,7 @@ export interface RemoteInfo {
   params: RemoteConfigParams;
   isLocalMedia?: boolean;
   rootPath?: string;
+  proxyUrl?: string;
 }
 
 export interface RemoteFieldSchema {
