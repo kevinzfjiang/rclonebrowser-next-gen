@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+config
+media
+.git
+.env
+*.log
