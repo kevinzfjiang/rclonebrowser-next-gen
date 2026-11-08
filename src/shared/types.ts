@@ -66,6 +66,7 @@ export interface TransferOptions {
   transfers?: number;
   checkers?: number;
   exclude?: string;
+  ignoreGlobalExclude?: boolean;
   createEmptySrcDirs?: boolean;
   deleteExtraneous?: boolean;
 }
@@ -144,6 +145,7 @@ export interface SystemStatus {
   pgid: string;
   authEnabled: boolean;
   globalBwLimit: string;
+  globalExclude: string;
   activeTasksCount: number;
   totalSpeed: number;
   uptimeSeconds: number;

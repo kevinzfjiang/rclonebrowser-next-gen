@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀 (中文文档)
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.3-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.4-0284c7.svg)](./version.json)
 [![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,31 +11,36 @@
 
 彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
 
-- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.3`)
+- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.4`)
 - 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
 ## ✨ 为什么升级到 RcloneBrowser Next Gen？
 
-| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.3`)** |
+| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.4`)** |
 | :--- | :--- | :--- |
 | **交互体验** | 基于 X11/noVNC 远程桌面视频流，高延迟、字体发虚、移动端无法操作 | **原生响应式 Web 界面**，60fps 丝滑交互，内置 5 套主题风格与中/繁/英三语切换 |
 | **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译官方 Rclone + Node.js 26 LTS Alpine 运行时**，零 X11/Qt5 依赖，构建快速稳定 |
 | **资源占用** | 闲置内存 ~350MB - 500MB | **闲置内存 ~40MB** |
 | **安全机制** | VNC 弱口令或 Docker 环境变量明文密码暴露 | **Console 随机初始密码 + 首次登录强制改密 + `/config/auth.json` Scrypt 加盐哈希存储 + 防暴力破解锁定** |
-| **功能扩展** | 仅限桌面版基础窗口 | 内置 **双栏多标签 Commander、任务暂停/恢复、每个网盘独立代理、Cron 定时同步** |
+| **功能扩展** | 仅限桌面版基础窗口 | 内置 **双栏多标签 Commander、群晖 `@eaDir` 与自定义过滤引擎、任务暂停/恢复、每个网盘独立代理、Cron 定时同步** |
 | **旧版兼容性** | `/config`、`/media`、端口 `5800` | **完全兼容**，启动时自动检测并迁移旧版 `/config/xdg/config/rclone/rclone.conf` |
 
 ---
 
-## 🛠️ 核心功能 (v2.3)
+## 🛠️ 核心功能 (v2.4)
 
 1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
    - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。
    - 内置本地数据卷 `@media` (`/media`)、多挂载点 (`LOCAL_MOUNTS`) 与任意云端 Remote 同屏浏览。
    - 支持 **拖拽上传文件**、**在线直接预览**（文本、代码、Markdown、JSON、图片、音视频）、文件流式下载、新建文件夹、重命名、批量删除、文件夹大小统计 (`rclone size`)。
    - 双栏一键 **复制到对侧 (`Copy →`)**、**移动到对侧 (`Move →`)**、**镜像同步目录 (`Sync ⇄`)**。
+
+2. **群晖 NAS (`@eaDir` / `#recycle`) 与自定义文件/文件夹过滤引擎 (`v2.4`)**
+   - **开箱默认过滤群晖系统目录**：默认自动排除群晖 DSM 生成的 `@eaDir/**`（缩略图与索引）、`#recycle/**`（回收站）、`#snapshot/**`（快照）、`@tmp/**`、`@sharebin/**`、`.SynologyWorkingDirectory/**` 等隐藏目录，防止成千上万个群晖系统碎片文件被同步到目标网盘。
+   - **一键预设包与自定义过滤规则**：点击顶部导航栏、文件管理器或任务中心的 **“过滤规则 (Filters)”** 按钮，可一键勾选 `群晖 DSM`、`macOS (.DS_Store)`、`Windows (Thumbs.db)`、`隐藏点文件 (.*)` 预设包，或自由添加自定义过滤文件夹（如 `node_modules/**`）与文件通配符（如 `*.bak`、`*.log`）。
+   - **文件管理器同步隐藏**：支持在文件管理器浏览列表中同步隐藏匹配的 `@eaDir`、`#recycle` 等杂乱系统目录。
 
 2. **支持暂停/恢复与独立 `.log` 日志文件的传输与同步中心 (`Transfers`)**
    - 支持 `Copy`、`Sync`、`Move`、`Check` 异步任务队列。

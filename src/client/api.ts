@@ -101,6 +101,12 @@ export const api = {
       body: JSON.stringify({ bwlimit }),
     }),
 
+  setGlobalExclude: (exclude: string) =>
+    requestJson<{ globalExclude: string }>('/api/system/exclude', {
+      method: 'POST',
+      body: JSON.stringify({ exclude }),
+    }),
+
   // Remotes & Config
   getRemotes: () =>
     requestJson<{ remotes: RemoteInfo[]; templates: RemoteProviderTemplate[] }>('/api/remotes'),
@@ -192,6 +198,7 @@ export const api = {
       tasks: TransferTask[];
       activeStats: { activeTasksCount: number; totalSpeed: number };
       globalBwLimit: string;
+      globalExclude: string;
     }>('/api/tasks'),
 
   createTask: (payload: {

@@ -143,6 +143,7 @@ app.get('/api/system/status', async (_req: Request, res: Response) => {
       pgid: PGID,
       authEnabled: authService.isAuthEnabled(),
       globalBwLimit: taskManager.getGlobalBwLimit(),
+      globalExclude: taskManager.getGlobalExclude(),
       activeTasksCount: activeStats.activeTasksCount,
       totalSpeed: activeStats.totalSpeed,
       uptimeSeconds: Math.floor(process.uptime()),
@@ -157,6 +158,12 @@ app.post('/api/system/bwlimit', (req: Request, res: Response) => {
   const { bwlimit } = req.body || {};
   const updated = taskManager.setGlobalBwLimit(String(bwlimit || 'off'));
   res.json({ globalBwLimit: updated });
+});
+
+app.post('/api/system/exclude', (req: Request, res: Response) => {
+  const { exclude } = req.body || {};
+  const updated = taskManager.setGlobalExclude(typeof exclude === 'string' ? exclude : '');
+  res.json({ globalExclude: updated });
 });
 
 // --- Remotes & Config Endpoints ---
@@ -364,6 +371,7 @@ app.get('/api/tasks', (_req: Request, res: Response) => {
     tasks: taskManager.getTasks(),
     activeStats: taskManager.getActiveStats(),
     globalBwLimit: taskManager.getGlobalBwLimit(),
+    globalExclude: taskManager.getGlobalExclude(),
   });
 });
 

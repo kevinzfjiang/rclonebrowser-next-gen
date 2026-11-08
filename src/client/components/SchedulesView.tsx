@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock,
   Edit3,
+  Filter,
   Loader2,
   Play,
   Plus,
@@ -18,6 +19,11 @@ import {
   ScheduleJob,
   TransferOperation,
 } from '../../shared/types';
+import {
+  FILTER_PRESETS,
+  mergeExcludePatterns,
+  parseExcludePatterns,
+} from '../../shared/filterPresets';
 import { api } from '../api';
 import { useI18n } from '../i18n';
 import { formatDateTime } from '../utils/format';
@@ -25,18 +31,22 @@ import { formatDateTime } from '../utils/format';
 interface SchedulesViewProps {
   schedules: ScheduleJob[];
   remotes: RemoteInfo[];
+  globalExclude: string;
   onRefreshSchedules: () => void;
   onRefreshTasks: () => void;
   onSwitchToTasks: () => void;
+  onOpenFilterModal: () => void;
   onNotify: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
   schedules,
   remotes,
+  globalExclude,
   onRefreshSchedules,
   onRefreshTasks,
   onSwitchToTasks,
+  onOpenFilterModal,
   onNotify,
 }) => {
   const { tr } = useI18n();
@@ -234,13 +244,25 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-lg shadow-sky-600/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{tr('新建定时任务', '新增排程任務', 'New Schedule')}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenFilterModal}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 text-sky-300 text-xs font-medium transition-colors"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>
+              {tr('全局过滤规则', '全域過濾規則', 'Filter Rules')} (
+              {parseExcludePatterns(globalExclude).length})
+            </span>
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-lg shadow-sky-600/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{tr('新建定时任务', '新增排程任務', 'New Schedule')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Schedules List */}
@@ -576,15 +598,54 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    {tr('排除文件规则 (--exclude，可选)', '排除檔案規則 (--exclude，選填)', 'Exclude Pattern (--exclude)')}
+                    {tr('额外排除文件规则 (--exclude，可选)', '額外排除檔案規則 (--exclude，選填)', 'Extra Exclude Pattern (--exclude)')}
                   </label>
                   <input
                     type="text"
                     value={exclude}
                     onChange={(e) => setExclude(e.target.value)}
-                    placeholder="*.tmp, node_modules/**"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                    placeholder="@eaDir/**, *.tmp"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono"
                   />
+                </div>
+              </div>
+
+              {/* Quick Filter Preset Chips */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-400">
+                    {tr(
+                      `自动生效全局过滤规则 (${parseExcludePatterns(globalExclude).length} 项，默认过滤群晖 @eaDir/#recycle)`,
+                      `自動生效全域過濾規則 (${parseExcludePatterns(globalExclude).length} 項，預設過濾群暉 @eaDir/#recycle)`,
+                      `Global filter rules (${parseExcludePatterns(globalExclude).length} patterns incl. Synology @eaDir) apply automatically`
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onOpenFilterModal}
+                    className="text-sky-400 hover:underline font-medium"
+                  >
+                    {tr('配置全局过滤规则 →', '設定全域過濾規則 →', 'Configure Global Rules →')}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500">
+                    {tr('快捷追加:', '捷徑追加:', 'Quick add:')}
+                  </span>
+                  {FILTER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        setExclude((prev) =>
+                          mergeExcludePatterns(prev, preset.patterns.join(', '))
+                        )
+                      }
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-slate-300 transition-colors"
+                    >
+                      + {tr(preset.zhCN.split(' ')[0], preset.zhTW.split(' ')[0], preset.en.split(' ')[0])}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

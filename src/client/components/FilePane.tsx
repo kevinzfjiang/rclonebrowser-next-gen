@@ -18,6 +18,7 @@ import {
   FileSpreadsheet,
   FileText,
   Film,
+  Filter,
   Folder,
   FolderPlus,
   HardDrive,
@@ -34,6 +35,10 @@ import {
   X,
 } from 'lucide-react';
 import { FileEntry, RemoteInfo, StorageQuota, TransferOperation } from '../../shared/types';
+import {
+  parseExcludePatterns,
+  shouldFilterExplorerEntry,
+} from '../../shared/filterPresets';
 import { api } from '../api';
 import { useI18n } from '../i18n';
 import { formatBytes, formatDateTime } from '../utils/format';
@@ -63,6 +68,9 @@ interface FilePaneProps {
   }) => Promise<void>;
   onNotify: (msg: string, type?: 'success' | 'error' | 'info') => void;
   refreshSignal?: number;
+  globalExclude?: string;
+  hideFilteredInExplorer?: boolean;
+  onOpenFilterModal?: () => void;
 }
 
 export const FilePane: React.FC<FilePaneProps> = ({
@@ -76,6 +84,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
   onTriggerTransfer,
   onNotify,
   refreshSignal,
+  globalExclude = '',
+  hideFilteredInExplorer = true,
+  onOpenFilterModal,
 }) => {
   const { tr } = useI18n();
   const activeTab = useMemo(
@@ -189,13 +200,27 @@ export const FilePane: React.FC<FilePaneProps> = ({
     }));
   }, [activeTab?.path]);
 
-  const filteredAndSortedEntries = useMemo(() => {
+  const activeExcludePatterns = useMemo(
+    () => parseExcludePatterns(globalExclude),
+    [globalExclude]
+  );
+
+  const { filteredAndSortedEntries, hiddenByFilterCount } = useMemo(() => {
+    let hiddenCount = 0;
+    const baseEntries = hideFilteredInExplorer
+      ? entries.filter((e) => {
+          const isHidden = shouldFilterExplorerEntry(e.Name, e.IsDir, activeExcludePatterns);
+          if (isHidden) hiddenCount++;
+          return !isHidden;
+        })
+      : entries;
+
     const q = searchQuery.trim().toLowerCase();
     const filtered = q
-      ? entries.filter((e) => e.Name.toLowerCase().includes(q))
-      : entries.slice();
+      ? baseEntries.filter((e) => e.Name.toLowerCase().includes(q))
+      : baseEntries.slice();
 
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       if (a.IsDir !== b.IsDir) return a.IsDir ? -1 : 1;
       let cmp = 0;
       if (sortBy === 'Name') {
@@ -209,7 +234,12 @@ export const FilePane: React.FC<FilePaneProps> = ({
       }
       return sortAsc ? cmp : -cmp;
     });
-  }, [entries, searchQuery, sortBy, sortAsc, dirSizes]);
+
+    return {
+      filteredAndSortedEntries: sorted,
+      hiddenByFilterCount: hiddenCount,
+    };
+  }, [entries, hideFilteredInExplorer, activeExcludePatterns, searchQuery, sortBy, sortAsc, dirSizes]);
 
   const toggleSelect = (pathStr: string) => {
     setSelectedPaths((prev) => {
@@ -719,24 +749,49 @@ export const FilePane: React.FC<FilePaneProps> = ({
           )}
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-44 sm:w-52">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={tr('过滤当前目录...', '過濾目前目錄...', 'Filter directory...')}
-            className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500/70 rounded-lg pl-8 pr-6 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none"
-          />
-          {searchQuery && (
+        {/* Search Input & Filter Rules Button */}
+        <div className="flex items-center gap-1.5">
+          {onOpenFilterModal && (
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              type="button"
+              onClick={onOpenFilterModal}
+              title={tr(
+                `配置全局过滤规则 (当前已激活 ${activeExcludePatterns.length} 条规则，本目录已隐藏 ${hiddenByFilterCount} 项如 @eaDir)`,
+                `設定全域過濾規則 (目前啟用 ${activeExcludePatterns.length} 條規則，本目錄已隱藏 ${hiddenByFilterCount} 項如 @eaDir)`,
+                `Configure exclude filter rules (${activeExcludePatterns.length} active, ${hiddenByFilterCount} hidden in folder)`
+              )}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                hiddenByFilterCount > 0
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-sky-300 hover:border-slate-700'
+              }`}
             >
-              <X className="w-3 h-3" />
+              <Filter className="w-3 h-3" />
+              <span>
+                {tr('过滤', '過濾', 'Filter')}
+                {hiddenByFilterCount > 0 ? ` (-${hiddenByFilterCount})` : ''}
+              </span>
             </button>
           )}
+
+          <div className="relative w-40 sm:w-48">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={tr('搜索当前目录...', '搜尋目前目錄...', 'Search folder...')}
+              className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500/70 rounded-lg pl-8 pr-6 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

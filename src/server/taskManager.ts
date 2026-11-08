@@ -14,6 +14,11 @@ import {
   TransferOptions,
   TransferTask,
 } from '../shared/types.js';
+import {
+  DEFAULT_GLOBAL_EXCLUDE,
+  mergeExcludePatterns,
+  parseExcludePatterns,
+} from '../shared/filterPresets.js';
 
 const MAX_LOG_LINES = 250;
 const MAX_STORED_TASKS = 100;
@@ -33,6 +38,7 @@ function buildLogFileName(operation: string, id: string, date = new Date()): str
 interface ServerSettings {
   globalBwLimit: string;
   maxConcurrentTasks: number;
+  globalExclude: string;
 }
 
 function getFreeLocalPort(): Promise<number> {
@@ -78,6 +84,7 @@ class TaskManager {
   private settings: ServerSettings = {
     globalBwLimit: 'off',
     maxConcurrentTasks: 3,
+    globalExclude: DEFAULT_GLOBAL_EXCLUDE,
   };
   private onTaskCompleteCallbacks: Array<(task: TransferTask) => void> = [];
 
@@ -144,6 +151,18 @@ class TaskManager {
     this.settings.globalBwLimit = limit.trim() || 'off';
     this.saveSettings();
     return this.settings.globalBwLimit;
+  }
+
+  public getGlobalExclude(): string {
+    return typeof this.settings.globalExclude === 'string'
+      ? this.settings.globalExclude
+      : DEFAULT_GLOBAL_EXCLUDE;
+  }
+
+  public setGlobalExclude(exclude: string): string {
+    this.settings.globalExclude = mergeExcludePatterns(exclude);
+    this.saveSettings();
+    return this.settings.globalExclude;
   }
 
   public getTasks(): TransferTask[] {
@@ -652,14 +671,19 @@ class TaskManager {
       args.push('--create-empty-src-dirs');
     }
 
-    if (task.options.exclude) {
-      const patterns = task.options.exclude
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      for (const pat of patterns) {
+    const effectiveExcludeStr = task.options.ignoreGlobalExclude
+      ? task.options.exclude || ''
+      : mergeExcludePatterns(this.getGlobalExclude(), task.options.exclude);
+    const excludePatterns = parseExcludePatterns(effectiveExcludeStr);
+
+    if (excludePatterns.length > 0) {
+      for (const pat of excludePatterns) {
         args.push('--exclude', pat);
       }
+      this.appendLog(
+        task,
+        `[FILTER] Exclude patterns applied (${excludePatterns.length}): ${excludePatterns.join(', ')}`
+      );
     }
 
     this.appendLog(task, `[CMD] rclone ${args.join(' ')}`);

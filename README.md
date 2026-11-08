@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.3-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.4-0284c7.svg)](./version.json)
 [![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
@@ -18,24 +18,29 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ## ✨ Why Upgrade to RcloneBrowser Next Gen?
 
-| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.3`)** |
+| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.4`)** |
 | :--- | :--- | :--- |
 | **UI Experience** | X11/noVNC remote desktop video stream; blurry fonts, high latency, unusable on mobile | **Native 60fps Web UI** with drag-and-drop upload, inline preview, 5 themes & 3 languages |
 | **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + Node.js 26 LTS Alpine runtime**; zero X11/Qt5 bloat |
 | **Memory Footprint** | ~350MB - 500MB idle | **~40MB idle** |
 | **Security** | VNC plaintext or insecure Docker `ENV` passwords | **Console Initial Random Password + Forced First-Login Password Change + Salted Scrypt Hash (`/config/auth.json`) + Brute-Force Protection** |
-| **Core Capabilities** | Basic desktop window | **Dual-Pane Commander, Pause/Resume Task Queue, Per-Remote Proxy, Cron Scheduler** |
+| **Core Capabilities** | Basic desktop window | **Dual-Pane Commander, Synology `@eaDir` & Custom Filter Engine, Pause/Resume Task Queue, Per-Remote Proxy, Cron Scheduler** |
 | **Drop-in Compatibility** | `/config`, `/media`, port `5800` | **100% compatible**; auto-migrates legacy `/config/xdg/config/rclone/rclone.conf` on startup |
 
 ---
 
-## 🛠️ Key Features (v2.3)
+## 🛠️ Key Features (v2.4)
 
 1. **Multi-Tab & Dual-Pane Commander File Explorer (`Explorer`)**
    - Switch between **Dual-Pane Commander** and **Single-Pane** layouts with independent multi-tab bars per pane.
    - Browse built-in `/media`, custom NAS mounts (`LOCAL_MOUNTS`), and any cloud Remote side-by-side.
    - Drag-and-drop file upload, **inline browser preview** (Text, Code, Markdown, JSON, Images, Video, Audio), streaming download, mkdir, rename, batch delete, and folder size calculation (`rclone size`).
    - One-click **Copy →**, **Move →**, and **Sync Dir ⇄** between panes.
+
+2. **Synology NAS (`@eaDir` / `#recycle`) & Custom File/Folder Filter Engine (`v2.4`)**
+   - **Out-of-the-Box Synology Exclusion**: Automatically excludes Synology DSM hidden metadata folders (`@eaDir/**`, `#recycle/**`, `#snapshot/**`, `@tmp/**`, `@sharebin/**`, `.SynologyWorkingDirectory/**`) across all transfers and scheduled jobs so NAS system clutter is never synced to your cloud remotes.
+   - **One-Click Filter Presets & Custom Wildcards**: Open the **Filters (`过滤规则`)** modal from the top bar, Explorer, Transfer Center, or Scheduler to toggle built-in presets (`Synology DSM`, `macOS .DS_Store`, `Windows Thumbs.db`, `Dotfiles`) or add custom folder (`node_modules/**`) and file (`*.bak`, `*.log`) rules.
+   - **Explorer View Filtering**: Optionally hide filtered system folders like `@eaDir` and `#recycle` right inside the Dual-Pane File Explorer.
 
 2. **Transfer & Sync Task Center with Pause / Resume & Full `.log` Files (`Transfers`)**
    - Asynchronous task queue supporting `Copy`, `Sync`, `Move`, and `Check`.

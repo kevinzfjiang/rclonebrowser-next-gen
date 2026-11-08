@@ -7,6 +7,7 @@ import {
   Clock,
   Download,
   ExternalLink,
+  Filter,
   Gauge,
   Loader2,
   Pause,
@@ -24,6 +25,11 @@ import {
   TransferOperation,
   TransferTask,
 } from '../../shared/types';
+import {
+  FILTER_PRESETS,
+  mergeExcludePatterns,
+  parseExcludePatterns,
+} from '../../shared/filterPresets';
 import { api } from '../api';
 import { useI18n } from '../i18n';
 import { formatBytes, formatDateTime, formatEta, formatSpeed } from '../utils/format';
@@ -32,8 +38,10 @@ interface TasksViewProps {
   tasks: TransferTask[];
   remotes: RemoteInfo[];
   globalBwLimit: string;
+  globalExclude: string;
   totalSpeed: number;
   onRefreshTasks: () => void;
+  onOpenFilterModal: () => void;
   onNotify: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -41,8 +49,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
   tasks,
   remotes,
   globalBwLimit,
+  globalExclude,
   totalSpeed,
   onRefreshTasks,
+  onOpenFilterModal,
   onNotify,
 }) => {
   const { tr } = useI18n();
@@ -309,6 +319,16 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenFilterModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/40 text-sky-300 text-xs font-medium transition-colors"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>
+              {tr('全局过滤规则', '全域過濾規則', 'Filter Rules')} (
+              {parseExcludePatterns(globalExclude).length})
+            </span>
+          </button>
           {(completedCount > 0 || failedCount > 0) && (
             <button
               onClick={handleClearCompleted}
@@ -838,15 +858,63 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">
-                    {tr('排除规则 (--exclude)', '排除規則 (--exclude)', 'Exclude (--exclude)')}
+                    {tr('额外排除规则 (--exclude)', '額外排除規則 (--exclude)', 'Extra Exclude (--exclude)')}
                   </label>
                   <input
                     type="text"
                     value={exclude}
                     onChange={(e) => setExclude(e.target.value)}
-                    placeholder="*.tmp, .DS_Store"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
+                    placeholder="@eaDir/**, *.bak"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 font-mono"
                   />
+                </div>
+              </div>
+
+              {/* Quick Filter Preset Chips */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-400">
+                    {tr(
+                      `已自动叠加全局过滤规则 (${parseExcludePatterns(globalExclude).length} 项，含群晖 @eaDir/#recycle 等)`,
+                      `已自動疊加全域過濾規則 (${parseExcludePatterns(globalExclude).length} 項，含群暉 @eaDir/#recycle 等)`,
+                      `Global filter rules (${parseExcludePatterns(globalExclude).length} patterns incl. Synology @eaDir) are applied automatically`
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onOpenFilterModal}
+                    className="text-sky-400 hover:underline font-medium"
+                  >
+                    {tr('管理全局过滤规则 →', '管理全域過濾規則 →', 'Manage Global Rules →')}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500">
+                    {tr('快捷追加:', '捷徑追加:', 'Quick add:')}
+                  </span>
+                  {FILTER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        setExclude((prev) =>
+                          mergeExcludePatterns(prev, preset.patterns.join(', '))
+                        )
+                      }
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-slate-300 transition-colors"
+                    >
+                      + {tr(preset.zhCN.split(' ')[0], preset.zhTW.split(' ')[0], preset.en.split(' ')[0])}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExclude((prev) => mergeExcludePatterns(prev, 'node_modules/**, .git/**'))
+                    }
+                    className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] text-slate-300 transition-colors"
+                  >
+                    + node_modules/.git
+                  </button>
                 </div>
               </div>
 

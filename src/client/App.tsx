@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Cloud,
   Columns,
+  Filter,
   FolderTree,
   Globe,
   Lock,
@@ -24,8 +25,13 @@ import {
   TransferOperation,
   TransferTask,
 } from '../shared/types';
+import {
+  DEFAULT_GLOBAL_EXCLUDE,
+  parseExcludePatterns,
+} from '../shared/filterPresets';
 import { api, setAuthToken } from './api';
 import { ExplorerTab, FilePane } from './components/FilePane';
+import { FilterRulesModal } from './components/FilterRulesModal';
 import { PreviewModal } from './components/PreviewModal';
 import { RemotesView } from './components/RemotesView';
 import { SchedulesView } from './components/SchedulesView';
@@ -66,6 +72,12 @@ export const App: React.FC = () => {
   const [templates, setTemplates] = useState<RemoteProviderTemplate[]>([]);
   const [tasks, setTasks] = useState<TransferTask[]>([]);
   const [globalBwLimit, setGlobalBwLimit] = useState<string>('off');
+  const [globalExclude, setGlobalExclude] = useState<string>(DEFAULT_GLOBAL_EXCLUDE);
+  const [hideFilteredInExplorer, setHideFilteredInExplorer] = useState<boolean>(() => {
+    const saved = localStorage.getItem('rclonebrowser_next_hide_filtered');
+    return saved === null ? true : saved === 'true';
+  });
+  const [filterModalOpen, setFilterModalOpen] = useState<boolean>(false);
   const [totalSpeed, setTotalSpeed] = useState<number>(0);
   const [schedules, setSchedules] = useState<ScheduleJob[]>([]);
 
@@ -116,6 +128,9 @@ export const App: React.FC = () => {
       const [tasksRes, sysRes] = await Promise.all([api.getTasks(), api.getSystemStatus()]);
       setTasks(tasksRes.tasks);
       setGlobalBwLimit(tasksRes.globalBwLimit);
+      if (typeof tasksRes.globalExclude === 'string') {
+        setGlobalExclude(tasksRes.globalExclude);
+      }
       setTotalSpeed(tasksRes.activeStats.totalSpeed);
       setSystemStatus(sysRes);
 
@@ -252,7 +267,16 @@ export const App: React.FC = () => {
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
-  const displayAppVersion = systemStatus?.appVersion || '2.3';
+  const displayAppVersion = systemStatus?.appVersion || '2.4';
+  const activeFilterCount = useMemo(
+    () => parseExcludePatterns(globalExclude).length,
+    [globalExclude]
+  );
+
+  const handleToggleHideInExplorer = (val: boolean) => {
+    setHideFilteredInExplorer(val);
+    localStorage.setItem('rclonebrowser_next_hide_filtered', String(val));
+  };
 
   if (authChecking) {
     return (
@@ -514,6 +538,27 @@ export const App: React.FC = () => {
             </select>
           </div>
 
+          {/* Filter Rules Button */}
+          <button
+            onClick={() => setFilterModalOpen(true)}
+            title={tr(
+              `全局文件/文件夹过滤规则 (已启用 ${activeFilterCount} 项，如群晖 @eaDir、#recycle)`,
+              `全域檔案/資料夾過濾規則 (已啟用 ${activeFilterCount} 項，如群暉 @eaDir、#recycle)`,
+              `Global Exclude Filter Rules (${activeFilterCount} active, e.g. Synology @eaDir)`
+            )}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-950 border border-slate-800 text-sky-400 hover:border-sky-500/50 transition-colors"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">
+              {tr('过滤规则', '過濾規則', 'Filters')}
+            </span>
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-mono">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
           {/* Security Center Button */}
           <button
             onClick={() => setSecurityModalOpen(true)}
@@ -572,6 +617,9 @@ export const App: React.FC = () => {
               onTriggerTransfer={handleTriggerExplorerTransfer}
               onNotify={notify}
               refreshSignal={refreshSignal}
+              globalExclude={globalExclude}
+              hideFilteredInExplorer={hideFilteredInExplorer}
+              onOpenFilterModal={() => setFilterModalOpen(true)}
             />
 
             {dualPane && (
@@ -593,6 +641,9 @@ export const App: React.FC = () => {
                 onTriggerTransfer={handleTriggerExplorerTransfer}
                 onNotify={notify}
                 refreshSignal={refreshSignal}
+                globalExclude={globalExclude}
+                hideFilteredInExplorer={hideFilteredInExplorer}
+                onOpenFilterModal={() => setFilterModalOpen(true)}
               />
             )}
           </div>
@@ -603,8 +654,10 @@ export const App: React.FC = () => {
             tasks={tasks}
             remotes={remotes}
             globalBwLimit={globalBwLimit}
+            globalExclude={globalExclude}
             totalSpeed={totalSpeed}
             onRefreshTasks={loadTasksAndStatus}
+            onOpenFilterModal={() => setFilterModalOpen(true)}
             onNotify={notify}
           />
         )}
@@ -623,9 +676,11 @@ export const App: React.FC = () => {
           <SchedulesView
             schedules={schedules}
             remotes={remotes}
+            globalExclude={globalExclude}
             onRefreshSchedules={loadSchedules}
             onRefreshTasks={loadTasksAndStatus}
             onSwitchToTasks={() => setActiveNav('tasks')}
+            onOpenFilterModal={() => setFilterModalOpen(true)}
             onNotify={notify}
           />
         )}
@@ -687,6 +742,19 @@ export const App: React.FC = () => {
           onClose={() => setPreviewTarget(null)}
         />
       )}
+
+      {/* Global Exclude Filter Rules Modal */}
+      <FilterRulesModal
+        isOpen={filterModalOpen}
+        globalExclude={globalExclude}
+        hideFilteredInExplorer={hideFilteredInExplorer}
+        onToggleHideInExplorer={handleToggleHideInExplorer}
+        onClose={() => setFilterModalOpen(false)}
+        onSaved={(nextExclude) => {
+          setGlobalExclude(nextExclude);
+        }}
+        onNotify={notify}
+      />
 
       {/* Security Center & Forced First-Login Password Change Modal */}
       <SecurityCenterModal

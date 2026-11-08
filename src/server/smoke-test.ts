@@ -21,7 +21,7 @@ import { authService, AuthError } from './authService.js';
 
 async function runSmokeTests() {
   console.log(`🧪 Starting RcloneBrowser Next Gen v${APP_VERSION} Integration Smoke Tests...`);
-  assert.strictEqual(APP_VERSION, '2.3', 'APP_VERSION should be loaded from version.json as 2.3');
+  assert.strictEqual(APP_VERSION, '2.4', 'APP_VERSION should be loaded from version.json as 2.4');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.77.0'), true, 'v1.77.0 > v1.76.0');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.76.0'), false, 'v1.76.0 == v1.76.0');
   ensureDirectoriesAndDefaults();
@@ -150,7 +150,8 @@ async function runSmokeTests() {
   await deleteEntry('@media', 'SmokeTestFolderRenamed', true);
   console.log('✔ File Explorer operations (list, mkdir, rename, size, delete) verified.');
 
-  // 4. Verify Transfer Task execution with real Rclone
+  // 4. Verify Transfer Task execution with real Rclone & Synology @eaDir exclusion filter
+  await makeDirectory('@media', 'Documents/@eaDir');
   const copyTask = taskManager.createTask({
     name: 'Smoke Test Copy Documents -> Backups/SmokeCopy',
     operation: 'copy',
@@ -180,15 +181,23 @@ async function runSmokeTests() {
   assert.ok(fs.existsSync(logFileInfo.filePath), 'Per-task .log file should exist in /config/logs');
   const logFileContent = fs.readFileSync(logFileInfo.filePath, 'utf-8');
   assert.ok(
-    logFileContent.includes('[CMD] rclone copy') && logFileContent.includes('[SUCCESS]'),
-    'Per-task .log file should contain full Rclone command and completion logs'
+    logFileContent.includes('[CMD] rclone copy') &&
+      logFileContent.includes('[FILTER]') &&
+      logFileContent.includes('@eaDir/**') &&
+      logFileContent.includes('[SUCCESS]'),
+    'Per-task .log file should contain full Rclone command, @eaDir/** filter, and completion logs'
   );
 
   const copiedFiles = await listDirectory('@media', 'Backups/SmokeCopy');
   assert.ok(copiedFiles.length > 0, 'Copied files should exist in Backups/SmokeCopy');
+  assert.ok(
+    !copiedFiles.some((f) => f.Name === '@eaDir'),
+    'Synology @eaDir folder must be automatically excluded from destination'
+  );
+  await deleteEntry('@media', 'Documents/@eaDir', true);
   await deleteEntry('@media', 'Backups/SmokeCopy', true);
   taskManager.deleteTask(copyTask.id);
-  console.log('✔ Real Rclone copy task execution, progress tracking & /config/logs/*.log file verified.');
+  console.log('✔ Real Rclone copy task execution, @eaDir filter exclusion & /config/logs/*.log verified.');
 
   // 5. Verify Cron Scheduler CRUD
   const schedule = schedulerService.createSchedule({

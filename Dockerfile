@@ -85,7 +85,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 LABEL org.opencontainers.image.title="RcloneBrowser Next Gen" \
       org.opencontainers.image.description="Modern Native Web GUI for Rclone in Docker" \
-      org.opencontainers.image.version="2.3" \
+      org.opencontainers.image.version="2.4" \
       org.opencontainers.image.source="https://github.com/kevinzfjiang/rclonebrowser-next-gen"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
