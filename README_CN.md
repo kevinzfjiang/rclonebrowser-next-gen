@@ -1,7 +1,8 @@
 # RcloneBrowser Next Gen 🚀 (中文文档)
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.2-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.3-0284c7.svg)](./version.json)
+[![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
 > 📖 **语言切换 / Documentation**: **[English Documentation (README.md)](./README.md)** | **简体中文**
@@ -10,17 +11,17 @@
 
 彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
 
-- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.2`)
+- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.3`)
 - 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
 ## ✨ 为什么升级到 RcloneBrowser Next Gen？
 
-| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.2`)** |
+| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.3`)** |
 | :--- | :--- | :--- |
 | **交互体验** | 基于 X11/noVNC 远程桌面视频流，高延迟、字体发虚、移动端无法操作 | **原生响应式 Web 界面**，60fps 丝滑交互，内置 5 套主题风格与中/繁/英三语切换 |
-| **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译官方 Rclone + 轻量 Node.js 服务**，零 X11/Qt5 依赖，构建快速稳定 |
+| **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译官方 Rclone + Node.js 26 LTS Alpine 运行时**，零 X11/Qt5 依赖，构建快速稳定 |
 | **资源占用** | 闲置内存 ~350MB - 500MB | **闲置内存 ~40MB** |
 | **安全机制** | VNC 弱口令或 Docker 环境变量明文密码暴露 | **Console 随机初始密码 + 首次登录强制改密 + `/config/auth.json` Scrypt 加盐哈希存储 + 防暴力破解锁定** |
 | **功能扩展** | 仅限桌面版基础窗口 | 内置 **双栏多标签 Commander、任务暂停/恢复、每个网盘独立代理、Cron 定时同步** |
@@ -28,7 +29,7 @@
 
 ---
 
-## 🛠️ 核心功能 (v2.2)
+## 🛠️ 核心功能 (v2.3)
 
 1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
    - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。
@@ -193,9 +194,9 @@ docker run -d \
 git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
 cd rclonebrowser-next-gen
 
-docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.2 .
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.3 .
 docker push yadiman/rclonebrowser-next-gen:latest
-docker push yadiman/rclonebrowser-next-gen:2.2
+docker push yadiman/rclonebrowser-next-gen:2.3
 ```
 
 ### 2. 本地 Node.js 开发调试

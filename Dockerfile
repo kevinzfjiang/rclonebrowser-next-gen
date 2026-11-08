@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Build Frontend (React + Tailwind + Vite) & Backend (TypeScript)
 # -----------------------------------------------------------------------------
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /build
 
@@ -20,9 +20,9 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 # -----------------------------------------------------------------------------
-# Stage 2: Lightweight Alpine Runtime + Official Rclone Engine
+# Stage 2: Lightweight Node.js 26 LTS Alpine Runtime + Official Rclone Engine
 # -----------------------------------------------------------------------------
-FROM alpine:3.21
+FROM node:26-alpine
 
 ARG RCLONE_VERSION=current
 ARG TARGETARCH=amd64
@@ -40,7 +40,6 @@ ENV APP_NAME="RcloneBrowser Next Gen" \
 # Install runtime dependencies & latest official Rclone binary
 RUN apk update && \
     apk add --no-cache \
-      nodejs \
       ca-certificates \
       curl \
       wget \
@@ -86,7 +85,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 LABEL org.opencontainers.image.title="RcloneBrowser Next Gen" \
       org.opencontainers.image.description="Modern Native Web GUI for Rclone in Docker" \
-      org.opencontainers.image.version="2.2" \
+      org.opencontainers.image.version="2.3" \
       org.opencontainers.image.source="https://github.com/kevinzfjiang/rclonebrowser-next-gen"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

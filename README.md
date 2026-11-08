@@ -1,7 +1,8 @@
 # RcloneBrowser Next Gen 🚀
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.2-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.3-0284c7.svg)](./version.json)
+[![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
 > 📖 **Documentation**: **English** | **[简体中文文档 (README_CN.md)](./README_CN.md)**
@@ -17,10 +18,10 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ## ✨ Why Upgrade to RcloneBrowser Next Gen?
 
-| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.2`)** |
+| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.3`)** |
 | :--- | :--- | :--- |
 | **UI Experience** | X11/noVNC remote desktop video stream; blurry fonts, high latency, unusable on mobile | **Native 60fps Web UI** with drag-and-drop upload, inline preview, 5 themes & 3 languages |
-| **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + lightweight Node.js API**; zero X11/Qt5 bloat |
+| **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + Node.js 26 LTS Alpine runtime**; zero X11/Qt5 bloat |
 | **Memory Footprint** | ~350MB - 500MB idle | **~40MB idle** |
 | **Security** | VNC plaintext or insecure Docker `ENV` passwords | **Console Initial Random Password + Forced First-Login Password Change + Salted Scrypt Hash (`/config/auth.json`) + Brute-Force Protection** |
 | **Core Capabilities** | Basic desktop window | **Dual-Pane Commander, Pause/Resume Task Queue, Per-Remote Proxy, Cron Scheduler** |
@@ -28,7 +29,7 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ---
 
-## 🛠️ Key Features (v2.2)
+## 🛠️ Key Features (v2.3)
 
 1. **Multi-Tab & Dual-Pane Commander File Explorer (`Explorer`)**
    - Switch between **Dual-Pane Commander** and **Single-Pane** layouts with independent multi-tab bars per pane.
@@ -187,9 +188,9 @@ docker run -d \
 git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
 cd rclonebrowser-next-gen
 
-docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.2 .
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.3 .
 docker push yadiman/rclonebrowser-next-gen:latest
-docker push yadiman/rclonebrowser-next-gen:2.2
+docker push yadiman/rclonebrowser-next-gen:2.3
 ```
 
 ### 2. Local Node.js Development

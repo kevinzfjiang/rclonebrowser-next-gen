@@ -42,7 +42,7 @@ function loadAppVersion(): { name: string; version: string } {
   }
   return {
     name: 'RcloneBrowser Next Gen',
-    version: process.env.APP_VERSION || '2.2',
+    version: process.env.APP_VERSION || '2.3',
   };
 }
 

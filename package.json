@@ -1,6 +1,6 @@
 {
   "name": "rclonebrowser-next-gen",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "RcloneBrowser Next Gen - Modern Native Web GUI for Rclone in Docker",
   "private": true,
   "type": "module",

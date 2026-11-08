@@ -8,7 +8,7 @@ MEDIA_DIR=${MEDIA_DIR:-/media}
 RCLONE_CONFIG=${RCLONE_CONFIG:-${CONFIG_DIR}/rclone/rclone.conf}
 
 echo "============================================================"
-echo " Starting RcloneBrowser Next Gen (v2.2)"
+echo " Starting RcloneBrowser Next Gen (v2.3)"
 echo " PUID: ${PUID} | PGID: ${PGID} | TZ: ${TZ:-UTC}"
 echo "============================================================"
 

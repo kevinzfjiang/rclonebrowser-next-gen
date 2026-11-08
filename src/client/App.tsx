@@ -252,7 +252,7 @@ export const App: React.FC = () => {
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
-  const displayAppVersion = systemStatus?.appVersion || '2.2';
+  const displayAppVersion = systemStatus?.appVersion || '2.3';
 
   if (authChecking) {
     return (
