@@ -24,6 +24,7 @@ import {
   StorageQuota,
 } from '../../shared/types';
 import { api } from '../api';
+import { useI18n } from '../i18n';
 import { formatBytes } from '../utils/format';
 
 interface RemotesViewProps {
@@ -41,6 +42,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
   onOpenRemoteInExplorer,
   onNotify,
 }) => {
+  const { tr } = useI18n();
   const [subTab, setSubTab] = useState<'cards' | 'raw'>('cards');
   const [quotas, setQuotas] = useState<Record<string, StorageQuota>>({});
   const [loadingQuota, setLoadingQuota] = useState<string | null>(null);
@@ -71,7 +73,10 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
       setRawPath(res.path);
       setRawContent(res.content);
     } catch (err: any) {
-      onNotify(err.message || '读取配置文件失败', 'error');
+      onNotify(
+        err.message || tr('读取配置文件失败', '讀取設定檔失敗', 'Failed to read config file'),
+        'error'
+      );
     } finally {
       setRawLoading(false);
     }
@@ -89,12 +94,29 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
       const q = await api.getRemoteQuota(name);
       setQuotas((prev) => ({ ...prev, [name]: q }));
       if (q.supported) {
-        onNotify(`已获取 "${name}" 存储空间信息`, 'success');
+        onNotify(
+          tr(
+            `已获取 "${name}" 存储空间信息`,
+            `已取得 "${name}" 儲存空間資訊`,
+            `Fetched storage quota for "${name}"`
+          ),
+          'success'
+        );
       } else {
-        onNotify(`"${name}" 后端协议暂不支持 rclone about 配额查询`, 'info');
+        onNotify(
+          tr(
+            `"${name}" 后端协议暂不支持 rclone about 配额查询`,
+            `"${name}" 後端協定暫不支援 rclone about 配額查詢`,
+            `"${name}" backend does not support rclone about quota`
+          ),
+          'info'
+        );
       }
     } catch (err: any) {
-      onNotify(err.message || '连接测试失败', 'error');
+      onNotify(
+        err.message || tr('连接测试失败', '連線測試失敗', 'Connection test failed'),
+        'error'
+      );
     } finally {
       setLoadingQuota(null);
     }
@@ -140,7 +162,12 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
       }
     }
 
-    const existingProxy = (remote.proxyUrl || remote.params._proxy_url || remote.params.proxy_url || '').trim();
+    const existingProxy = (
+      remote.proxyUrl ||
+      remote.params._proxy_url ||
+      remote.params.proxy_url ||
+      ''
+    ).trim();
     if (!existingProxy) {
       setProxyMode('direct');
       setProxyUrlInput('');
@@ -193,7 +220,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
   const handleSaveRemote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!remoteName.trim()) {
-      onNotify('请输入 Remote 名称', 'error');
+      onNotify(tr('请输入 Remote 名称', '請輸入 Remote 名稱', 'Please enter a Remote name'), 'error');
       return;
     }
 
@@ -219,23 +246,42 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
         obscurePasswords,
       });
       setShowWizard(false);
-      onNotify(`已保存 Remote 配置: ${remoteName}`, 'success');
+      onNotify(
+        tr(
+          `已保存 Remote 配置: ${remoteName}`,
+          `已儲存 Remote 設定: ${remoteName}`,
+          `Saved Remote: ${remoteName}`
+        ),
+        'success'
+      );
       onRefreshRemotes();
     } catch (err: any) {
-      onNotify(err.message || '保存 Remote 失败', 'error');
+      onNotify(err.message || tr('保存 Remote 失败', '儲存 Remote 失敗', 'Failed to save Remote'), 'error');
     } finally {
       setSavingRemote(false);
     }
   };
 
   const handleDeleteRemote = async (name: string) => {
-    if (!window.confirm(`确定要从 rclone.conf 中删除 Remote "${name}" 吗？`)) return;
+    if (
+      !window.confirm(
+        tr(
+          `确定要从 rclone.conf 中删除 Remote "${name}" 吗？`,
+          `確定要從 rclone.conf 中刪除 Remote "${name}" 嗎？`,
+          `Are you sure you want to delete Remote "${name}" from rclone.conf?`
+        )
+      )
+    )
+      return;
     try {
       await api.deleteRemote(name);
-      onNotify(`已删除 Remote: ${name}`, 'info');
+      onNotify(
+        tr(`已删除 Remote: ${name}`, `已刪除 Remote: ${name}`, `Deleted Remote: ${name}`),
+        'info'
+      );
       onRefreshRemotes();
     } catch (err: any) {
-      onNotify(err.message || '删除失败', 'error');
+      onNotify(err.message || tr('删除失败', '刪除失敗', 'Delete failed'), 'error');
     }
   };
 
@@ -243,10 +289,20 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setRawSaving(true);
     try {
       await api.saveRawConfig(rawContent);
-      onNotify('rclone.conf 配置文件已保存并生效', 'success');
+      onNotify(
+        tr(
+          'rclone.conf 配置文件已保存并生效',
+          'rclone.conf 設定檔已儲存並生效',
+          'rclone.conf saved and reloaded'
+        ),
+        'success'
+      );
       onRefreshRemotes();
     } catch (err: any) {
-      onNotify(err.message || '保存配置文件失败', 'error');
+      onNotify(
+        err.message || tr('保存配置文件失败', '儲存設定檔失敗', 'Failed to save config'),
+        'error'
+      );
     } finally {
       setRawSaving(false);
     }
@@ -259,7 +315,14 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         setRawContent(reader.result);
-        onNotify(`已导入 "${file.name}"，请点击“保存配置”使其生效`, 'info');
+        onNotify(
+          tr(
+            `已导入 "${file.name}"，请点击“保存配置”使其生效`,
+            `已匯入 "${file.name}"，請點擊「儲存設定」使其生效`,
+            `Imported "${file.name}". Click "Save Config" to apply.`
+          ),
+          'info'
+        );
       }
     };
     reader.readAsText(file);
@@ -292,7 +355,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
             }`}
           >
             <Cloud className="w-3.5 h-3.5" />
-            <span>已配置存储源 ({remotes.length})</span>
+            <span>
+              {tr('已配置存储源', '已設定儲存源', 'Configured Remotes')} ({remotes.length})
+            </span>
           </button>
 
           <button
@@ -304,7 +369,13 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
             }`}
           >
             <Code2 className="w-3.5 h-3.5" />
-            <span>rclone.conf 源文件编辑与导入</span>
+            <span>
+              {tr(
+                'rclone.conf 源文件编辑与导入',
+                'rclone.conf 原始檔編輯與匯入',
+                'rclone.conf Raw Editor & Import'
+              )}
+            </span>
           </button>
         </div>
 
@@ -314,7 +385,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-lg shadow-sky-600/20"
           >
             <Plus className="w-4 h-4" />
-            <span>新增 Remote 存储源</span>
+            <span>{tr('新增 Remote 存储源', '新增 Remote 儲存源', 'Add Remote')}</span>
           </button>
         )}
       </div>
@@ -358,9 +429,9 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-sm font-bold text-slate-100 truncate">
                               {r.name === '@media'
-                                ? '本地数据卷 (/media)'
+                                ? tr('本地数据卷 (/media)', '本機資料卷 (/media)', 'Local Volume (/media)')
                                 : isBuiltin
-                                  ? `本地挂载点: ${r.name.slice(1)}`
+                                  ? `${tr('本地挂载点', '本機掛載點', 'Local Mount')}: ${r.name.slice(1)}`
                                   : `${r.name}:`}
                             </h4>
                             <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-300 font-mono text-[10px] uppercase">
@@ -369,13 +440,13 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                           </div>
                           <p className="text-xs text-slate-400 mt-0.5 truncate">
                             {isBuiltin
-                              ? `容器挂载路径: ${r.rootPath || '/media'}`
+                              ? `${tr('挂载路径', '掛載路徑', 'Mount Path')}: ${r.rootPath || '/media'}`
                               : r.params.endpoint ||
                                 r.params.url ||
                                 r.params.host ||
                                 r.params.remote ||
                                 r.params.provider ||
-                                '标准 Rclone 存储节点'}
+                                tr('标准 Rclone 存储节点', '標準 Rclone 儲存節點', 'Rclone Storage Node')}
                           </p>
                         </div>
                       </div>
@@ -394,13 +465,19 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                           <>
                             <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                             <span className="font-mono truncate" title={proxyVal}>
-                              独立代理: {proxyVal}
+                              {tr('独立代理', '獨立代理', 'Proxy')}: {proxyVal}
                             </span>
                           </>
                         ) : (
                           <>
                             <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span>网络策略: 直连 (无代理)</span>
+                            <span>
+                              {tr(
+                                '网络策略: 直连 (无代理)',
+                                '網路策略: 直連 (無代理)',
+                                'Network: Direct (No Proxy)'
+                              )}
+                            </span>
                           </>
                         )}
                       </div>
@@ -427,15 +504,23 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                         })}
                       {Object.keys(r.params).filter(
                         (k) => k !== 'type' && k !== '_proxy_url' && k !== 'proxy_url'
-                      ).length === 0 && <div className="text-slate-500">默认参数配置</div>}
+                      ).length === 0 && (
+                        <div className="text-slate-500">
+                          {tr('默认参数配置', '預設參數設定', 'Default parameters')}
+                        </div>
+                      )}
                     </div>
 
                     {/* Quota Display if loaded */}
                     {q && q.supported && (
                       <div className="bg-emerald-950/20 border border-emerald-800/40 rounded-lg px-3 py-2 text-xs flex items-center justify-between">
-                        <span className="text-emerald-300">已用: {formatBytes(q.used)}</span>
+                        <span className="text-emerald-300">
+                          {tr('已用', '已用', 'Used')}: {formatBytes(q.used)}
+                        </span>
                         {q.free !== undefined && (
-                          <span className="text-slate-300">可用: {formatBytes(q.free)}</span>
+                          <span className="text-slate-300">
+                            {tr('可用', '可用', 'Free')}: {formatBytes(q.free)}
+                          </span>
                         )}
                       </div>
                     )}
@@ -448,14 +533,14 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-medium transition-colors"
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
-                      <span>浏览文件</span>
+                      <span>{tr('浏览文件', '瀏覽檔案', 'Browse')}</span>
                     </button>
 
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleCheckQuota(r.name)}
                         disabled={loadingQuota === r.name}
-                        title="查询容量与连接状态 (rclone about)"
+                        title={tr('查询容量与连接状态 (rclone about)', '查詢容量與連線狀態 (rclone about)', 'Check quota & connection')}
                         className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs inline-flex items-center gap-1"
                       >
                         {loadingQuota === r.name ? (
@@ -463,21 +548,21 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                         ) : (
                           <RefreshCw className="w-3.5 h-3.5" />
                         )}
-                        <span>测速/容量</span>
+                        <span>{tr('测速/容量', '測速/容量', 'Quota')}</span>
                       </button>
 
                       {!isBuiltin && (
                         <>
                           <button
                             onClick={() => openEditWizard(r)}
-                            title="编辑此 Remote 与代理设置"
+                            title={tr('编辑此 Remote 与代理设置', '編輯此 Remote 與代理設定', 'Edit Remote & Proxy')}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRemote(r.name)}
-                            title="删除此 Remote"
+                            title={tr('删除此 Remote', '刪除此 Remote', 'Delete Remote')}
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -494,7 +579,11 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
           {/* Quick Templates Showcase */}
           <div className="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 space-y-3">
             <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              快速添加主流云存储与协议向导（支持为每个存储单独绑定 HTTP / SOCKS5 代理）
+              {tr(
+                '快速添加主流云存储与协议向导（支持为每个存储单独绑定 HTTP / SOCKS5 代理）',
+                '快速新增主流雲端儲存與協定精靈（支援為每個儲存單獨綁定 HTTP / SOCKS5 代理）',
+                'Quick Add Storage Provider Wizard (Supports Per-Remote HTTP / SOCKS5 Proxy)'
+              )}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {templates.map((tpl) => (
@@ -522,12 +611,20 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
         <div className="flex-1 flex flex-col bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-800 bg-slate-950/50">
             <div className="text-xs">
-              <span className="text-slate-400">配置文件路径: </span>
+              <span className="text-slate-400">
+                {tr('配置文件路径: ', '設定檔路徑: ', 'Config Path: ')}
+              </span>
               <code className="text-sky-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
                 {rawPath || '/config/rclone/rclone.conf'}
               </code>
               <span className="ml-3 text-slate-500">
-                (提示: 可在任意段落添加 <code className="text-indigo-300">_proxy_url = socks5://ip:port</code> 绑定独立代理)
+                (
+                {tr(
+                  '提示: 可添加 _proxy_url = socks5://ip:port 绑定独立代理',
+                  '提示: 可新增 _proxy_url = socks5://ip:port 綁定獨立代理',
+                  'Tip: Add _proxy_url = socks5://ip:port for per-remote proxy'
+                )}
+                )
               </span>
             </div>
 
@@ -544,7 +641,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>导入 rclone.conf</span>
+                <span>{tr('导入 rclone.conf', '匯入 rclone.conf', 'Import rclone.conf')}</span>
               </button>
 
               <button
@@ -552,7 +649,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>导出备份</span>
+                <span>{tr('导出备份', '匯出備份', 'Export Backup')}</span>
               </button>
 
               <button
@@ -565,7 +662,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 ) : (
                   <Save className="w-3.5 h-3.5" />
                 )}
-                <span>保存配置</span>
+                <span>{tr('保存配置', '儲存設定', 'Save Config')}</span>
               </button>
             </div>
           </div>
@@ -574,14 +671,14 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
             {rawLoading ? (
               <div className="flex-1 flex items-center justify-center text-slate-400 text-xs gap-2">
                 <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
-                正在加载 rclone.conf...
+                {tr('正在加载 rclone.conf...', '正在載入 rclone.conf...', 'Loading rclone.conf...')}
               </div>
             ) : (
               <textarea
                 value={rawContent}
                 onChange={(e) => setRawContent(e.target.value)}
                 spellCheck={false}
-                placeholder="# 在此粘贴或编辑标准 INI 格式的 rclone.conf 内容..."
+                placeholder="# Paste or edit standard INI-formatted rclone.conf content here..."
                 className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-sky-500 resize-none leading-relaxed select-text"
               />
             )}
@@ -598,7 +695,13 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
           >
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-100">
-                {editingMode ? `编辑 Remote: ${remoteName}` : '新增 Rclone Remote 存储配置向导'}
+                {editingMode
+                  ? `${tr('编辑 Remote', '編輯 Remote', 'Edit Remote')}: ${remoteName}`
+                  : tr(
+                      '新增 Rclone Remote 存储配置向导',
+                      '新增 Rclone Remote 儲存設定精靈',
+                      'Add Rclone Remote Wizard'
+                    )}
               </h3>
               <button
                 type="button"
@@ -614,7 +717,11 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">
-                    Remote 标识名称 (不含冒号) *
+                    {tr(
+                      'Remote 标识名称 (不含冒号) *',
+                      'Remote 識別名稱 (不含冒號) *',
+                      'Remote Name (without colon) *'
+                    )}
                   </label>
                   <input
                     type="text"
@@ -622,14 +729,18 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     disabled={editingMode}
                     value={remoteName}
                     onChange={(e) => setRemoteName(e.target.value)}
-                    placeholder="例如: gdrive_a, gdrive_b, onedrive"
+                    placeholder="e.g. gdrive_a, gdrive_b, onedrive"
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 font-mono disabled:opacity-60"
                   />
                 </div>
 
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">
-                    Rclone 存储协议类型 (Type) *
+                    {tr(
+                      'Rclone 存储协议类型 (Type) *',
+                      'Rclone 儲存協定類型 (Type) *',
+                      'Storage Provider Type *'
+                    )}
                   </label>
                   <select
                     value={selectedType}
@@ -651,11 +762,19 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-indigo-400" />
                     <span className="font-semibold text-indigo-200">
-                      独立网络代理设置 (Per-Remote Proxy)
+                      {tr(
+                        '独立网络代理设置 (Per-Remote Proxy)',
+                        '獨立網路代理設定 (Per-Remote Proxy)',
+                        'Per-Remote Network Proxy'
+                      )}
                     </span>
                   </div>
                   <span className="text-[11px] text-indigo-300/80">
-                    仅对该 Remote 生效，互不干扰
+                    {tr(
+                      '仅对该 Remote 生效，互不干扰',
+                      '僅對該 Remote 生效，互不干擾',
+                      'Isolated per remote'
+                    )}
                   </span>
                 </div>
 
@@ -670,7 +789,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     }`}
                   >
                     <Zap className="w-3.5 h-3.5" />
-                    <span>直连 (无代理)</span>
+                    <span>{tr('直连 (无代理)', '直連 (無代理)', 'Direct (No Proxy)')}</span>
                   </button>
 
                   <button
@@ -683,7 +802,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     }`}
                   >
                     <Globe className="w-3.5 h-3.5" />
-                    <span>HTTP / HTTPS 代理</span>
+                    <span>{tr('HTTP / HTTPS 代理', 'HTTP / HTTPS 代理', 'HTTP / HTTPS Proxy')}</span>
                   </button>
 
                   <button
@@ -696,14 +815,18 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     }`}
                   >
                     <Globe className="w-3.5 h-3.5" />
-                    <span>SOCKS5 代理</span>
+                    <span>{tr('SOCKS5 代理', 'SOCKS5 代理', 'SOCKS5 Proxy')}</span>
                   </button>
                 </div>
 
                 {proxyMode !== 'direct' && (
                   <div className="space-y-1.5 pt-1">
                     <label className="block text-slate-300 font-medium">
-                      代理服务器地址 (支持带账号密码认证)
+                      {tr(
+                        '代理服务器地址 (支持带账号密码认证)',
+                        '代理伺服器位址 (支援帶帳號密碼驗證)',
+                        'Proxy URL (Supports user:pass authentication)'
+                      )}
                     </label>
                     <input
                       type="text"
@@ -712,14 +835,11 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                       onChange={(e) => setProxyUrlInput(e.target.value)}
                       placeholder={
                         proxyMode === 'socks5'
-                          ? 'socks5://192.168.1.2:1080 或 socks5://user:pass@192.168.1.2:1080'
-                          : 'http://192.168.1.2:7890 或 http://user:pass@192.168.1.2:7890'
+                          ? 'socks5://192.168.1.2:1080 or socks5://user:pass@192.168.1.2:1080'
+                          : 'http://192.168.1.2:7890 or http://user:pass@192.168.1.2:7890'
                       }
                       className="w-full bg-slate-950 border border-indigo-500/50 rounded-lg px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-indigo-400"
                     />
-                    <p className="text-[11px] text-slate-400">
-                      例如：Google Drive A 可设为 <code className="text-indigo-300">socks5://192.168.1.2:1080</code>，Google Drive B 设为 <code className="text-indigo-300">http://192.168.1.2:7890</code>，OneDrive 选择“直连”。即使在不同代理的网盘之间直接对传，系统也会自动启动双进程隔离桥接。
-                    </p>
                   </div>
                 )}
               </div>
@@ -779,14 +899,20 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
               {/* Custom Extra Parameters */}
               <div className="pt-2 border-t border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300 font-medium">附加自定义参数 (高级可选)</span>
+                  <span className="text-slate-300 font-medium">
+                    {tr(
+                      '附加自定义参数 (高级可选)',
+                      '附加自訂參數 (進階選填)',
+                      'Custom Extra Parameters (Optional)'
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setCustomKV((prev) => [...prev, { key: '', value: '' }])}
                     className="text-sky-400 hover:text-sky-300 text-xs inline-flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    添加键值对
+                    {tr('添加键值对', '新增鍵值對', 'Add Key-Value')}
                   </button>
                 </div>
 
@@ -800,7 +926,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                           prev.map((row, i) => (i === idx ? { ...row, key: e.target.value } : row))
                         )
                       }
-                      placeholder="参数名 (如 chunk_size)"
+                      placeholder="key (e.g. chunk_size)"
                       className="w-1/3 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-100"
                     />
                     <input
@@ -813,7 +939,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                           )
                         )
                       }
-                      placeholder="参数值 (如 64M)"
+                      placeholder="value (e.g. 64M)"
                       className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-100"
                     />
                     <button
@@ -836,8 +962,11 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                     className="rounded border-slate-700 bg-slate-950 text-sky-500"
                   />
                   <span className="text-slate-300">
-                    自动使用 <code className="text-sky-400">rclone obscure</code> 加密明文密码字段
-                    (WebDAV / SFTP / SMB / FTP / Crypt 必选)
+                    {tr(
+                      '自动使用 rclone obscure 加密明文密码字段 (WebDAV / SFTP / SMB / FTP / Crypt 必选)',
+                      '自動使用 rclone obscure 加密明文密碼欄位 (WebDAV / SFTP / SMB / FTP / Crypt 必選)',
+                      'Automatically obscure plain-text passwords via rclone obscure'
+                    )}
                   </span>
                 </label>
               </div>
@@ -849,7 +978,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 onClick={() => setShowWizard(false)}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
               >
-                取消
+                {tr('取消', '取消', 'Cancel')}
               </button>
               <button
                 type="submit"
@@ -861,7 +990,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
                 ) : (
                   <Save className="w-3.5 h-3.5" />
                 )}
-                <span>保存 Remote 配置</span>
+                <span>{tr('保存 Remote 配置', '儲存 Remote 設定', 'Save Remote')}</span>
               </button>
             </div>
           </form>

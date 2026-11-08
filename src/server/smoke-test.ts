@@ -5,6 +5,7 @@ import {
   deleteRemote,
   getRcloneVersionInfo,
   getRemoteProxyUrl,
+  isNewerRcloneVersion,
   listDirectory,
   listRemotes,
   makeDirectory,
@@ -14,10 +15,13 @@ import {
 } from './rcloneService.js';
 import { taskManager } from './taskManager.js';
 import { schedulerService } from './schedulerService.js';
-import { ensureDirectoriesAndDefaults } from './config.js';
+import { APP_VERSION, ensureDirectoriesAndDefaults } from './config.js';
 
 async function runSmokeTests() {
-  console.log('🧪 Starting RcloneBrowser Next Gen Integration Smoke Tests...');
+  console.log(`🧪 Starting RcloneBrowser Next Gen v${APP_VERSION} Integration Smoke Tests...`);
+  assert.strictEqual(APP_VERSION, '2.1', 'APP_VERSION should be loaded from version.json as 2.1');
+  assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.77.0'), true, 'v1.77.0 > v1.76.0');
+  assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.76.0'), false, 'v1.76.0 == v1.76.0');
   ensureDirectoriesAndDefaults();
 
   // 1. Verify Rclone version detection

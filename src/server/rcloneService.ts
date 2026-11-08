@@ -23,40 +23,131 @@ const OBSCURE_KEYS_BY_TYPE: Record<string, string[]> = {
 export interface RcloneVersionDetails {
   available: boolean;
   version: string;
+  latestVersion?: string;
+  updateAvailable?: boolean;
   osInfo: string;
   arch: string;
   goVersion: string;
 }
 
 let cachedVersionInfo: RcloneVersionDetails | null = null;
+let lastLatestCheckMs = 0;
+let checkingLatestPromise: Promise<void> | null = null;
+
+function parseSemverNumbers(ver: string): number[] {
+  const clean = ver.replace(/^rclone\s+/i, '').replace(/^v/i, '').trim();
+  return clean
+    .split(/[.-]/)
+    .map((n) => parseInt(n, 10))
+    .filter((n) => !Number.isNaN(n));
+}
+
+export function isNewerRcloneVersion(currentVer: string, latestVer: string): boolean {
+  const curr = parseSemverNumbers(currentVer);
+  const next = parseSemverNumbers(latestVer);
+  if (curr.length === 0 || next.length === 0) return false;
+  const len = Math.max(curr.length, next.length);
+  for (let i = 0; i < len; i++) {
+    const c = curr[i] || 0;
+    const n = next[i] || 0;
+    if (n > c) return true;
+    if (n < c) return false;
+  }
+  return false;
+}
+
+async function refreshLatestRcloneVersion(): Promise<void> {
+  if (!cachedVersionInfo || !cachedVersionInfo.available) return;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://downloads.rclone.org/version.txt', {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const txt = (await res.text()).trim();
+      const latestVer = txt.replace(/^rclone\s+/i, '').trim();
+      if (latestVer.startsWith('v')) {
+        cachedVersionInfo.latestVersion = latestVer;
+        cachedVersionInfo.updateAvailable = isNewerRcloneVersion(
+          cachedVersionInfo.version,
+          latestVer
+        );
+        lastLatestCheckMs = Date.now();
+        return;
+      }
+    }
+  } catch {
+    // Fallback to `rclone version --check` if direct HTTP fetch fails
+  }
+
+  try {
+    const { stdout } = await execFileAsync('rclone', ['version', '--check'], { timeout: 8000 });
+    const latestLine = stdout
+      .split(/\r?\n/)
+      .find((l) => l.trim().toLowerCase().startsWith('latest:'));
+    if (latestLine) {
+      const rawVer = latestLine.split(':')[1]?.trim().split(/\s+/)[0] || '';
+      const latestVer = rawVer.startsWith('v') ? rawVer : `v${rawVer}`;
+      cachedVersionInfo.latestVersion = latestVer;
+      cachedVersionInfo.updateAvailable = isNewerRcloneVersion(
+        cachedVersionInfo.version,
+        latestVer
+      );
+      lastLatestCheckMs = Date.now();
+    }
+  } catch {
+    // Ignore version check failure if offline
+  }
+}
 
 export async function getRcloneVersionInfo(): Promise<RcloneVersionDetails> {
-  if (cachedVersionInfo) return cachedVersionInfo;
-  try {
-    const { stdout } = await execFileAsync('rclone', ['version'], { timeout: 8000 });
-    const lines = stdout.trim().split(/\r?\n/);
-    const versionLine = lines[0] || 'rclone unknown';
-    const osVersion = lines.find((l) => l.includes('os/version:'))?.split(':')[1]?.trim() || process.platform;
-    const arch = lines.find((l) => l.includes('os/arch:'))?.split(':')[1]?.trim() || process.arch;
-    const goVersion = lines.find((l) => l.includes('go/version:'))?.split(':')[1]?.trim() || 'unknown';
+  if (!cachedVersionInfo) {
+    try {
+      const { stdout } = await execFileAsync('rclone', ['version'], { timeout: 8000 });
+      const lines = stdout.trim().split(/\r?\n/);
+      const versionLine = lines[0] || 'rclone unknown';
+      const osVersion =
+        lines.find((l) => l.includes('os/version:'))?.split(':')[1]?.trim() || process.platform;
+      const arch = lines.find((l) => l.includes('os/arch:'))?.split(':')[1]?.trim() || process.arch;
+      const goVersion =
+        lines.find((l) => l.includes('go/version:'))?.split(':')[1]?.trim() || 'unknown';
 
-    cachedVersionInfo = {
-      available: true,
-      version: versionLine.replace(/^rclone\s+/i, ''),
-      osInfo: osVersion,
-      arch,
-      goVersion,
-    };
-    return cachedVersionInfo;
-  } catch {
-    return {
-      available: false,
-      version: 'Not Found (Local Fallback Mode)',
-      osInfo: process.platform,
-      arch: process.arch,
-      goVersion: 'N/A',
-    };
+      cachedVersionInfo = {
+        available: true,
+        version: versionLine.replace(/^rclone\s+/i, ''),
+        osInfo: osVersion,
+        arch,
+        goVersion,
+      };
+    } catch {
+      return {
+        available: false,
+        version: 'Not Found (Local Fallback Mode)',
+        osInfo: process.platform,
+        arch: process.arch,
+        goVersion: 'N/A',
+      };
+    }
   }
+
+  // Trigger non-blocking latest version check if older than 30 minutes
+  const now = Date.now();
+  if (now - lastLatestCheckMs > 30 * 60 * 1000 && !checkingLatestPromise) {
+    checkingLatestPromise = refreshLatestRcloneVersion().finally(() => {
+      checkingLatestPromise = null;
+    });
+    // Wait up to 800ms on very first call so local/fast networks get it immediately
+    if (lastLatestCheckMs === 0) {
+      await Promise.race([
+        checkingLatestPromise,
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ]);
+    }
+  }
+
+  return cachedVersionInfo;
 }
 
 export function sanitizeRelPath(relPath: string): string {

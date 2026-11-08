@@ -6,12 +6,11 @@ import {
   Cloud,
   Columns,
   FolderTree,
-  HardDrive,
+  Globe,
   Lock,
   LogOut,
   Maximize2,
-  ShieldCheck,
-  Terminal,
+  Palette,
   XCircle,
 } from 'lucide-react';
 import {
@@ -29,6 +28,7 @@ import { PreviewModal } from './components/PreviewModal';
 import { RemotesView } from './components/RemotesView';
 import { SchedulesView } from './components/SchedulesView';
 import { TasksView } from './components/TasksView';
+import { LOCALE_OPTIONS, LocaleCode, THEME_OPTIONS, ThemeId, useI18n } from './i18n';
 import { formatSpeed } from './utils/format';
 
 type NavSection = 'explorer' | 'tasks' | 'remotes' | 'schedules';
@@ -40,6 +40,8 @@ interface ToastMessage {
 }
 
 export const App: React.FC = () => {
+  const { locale, setLocale, theme, setTheme, tr } = useI18n();
+
   // Auth state
   const [authChecking, setAuthChecking] = useState(true);
   const [authRequired, setAuthRequired] = useState(false);
@@ -128,7 +130,7 @@ export const App: React.FC = () => {
       const res = await api.getSchedules();
       setSchedules(res.schedules);
     } catch {
-      // Ignore
+      // Ignore schedule load errors
     }
   }, []);
 
@@ -166,7 +168,7 @@ export const App: React.FC = () => {
       setAuthenticated(true);
       setLoginPass('');
     } catch (err: any) {
-      setLoginError(err.message || '登录失败');
+      setLoginError(err.message || tr('登录失败', '登入失敗', 'Login failed'));
     }
   };
 
@@ -208,12 +210,19 @@ export const App: React.FC = () => {
         },
       });
       notify(
-        `已启动 ${res.tasks.length} 个 ${params.operation.toUpperCase()} 传输任务`,
+        tr(
+          `已启动 ${res.tasks.length} 个 ${params.operation.toUpperCase()} 传输任务`,
+          `已啟動 ${res.tasks.length} 個 ${params.operation.toUpperCase()} 傳輸任務`,
+          `Started ${res.tasks.length} ${params.operation.toUpperCase()} task(s)`
+        ),
         'success'
       );
       loadTasksAndStatus();
     } catch (err: any) {
-      notify(err.message || '启动传输任务失败', 'error');
+      notify(
+        err.message || tr('启动传输任务失败', '啟動傳輸任務失敗', 'Failed to start transfer task'),
+        'error'
+      );
     }
   };
 
@@ -225,15 +234,20 @@ export const App: React.FC = () => {
   };
 
   const activeTasksCount = tasks.filter(
-    (t) => t.status === 'running' || t.status === 'queued'
+    (t) => t.status === 'running' || t.status === 'queued' || t.status === 'paused'
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
+  const displayAppVersion = systemStatus?.appVersion || '2.1';
 
   if (authChecking) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-950 text-slate-400 text-sm">
-        正在初始化 RcloneBrowser Next Gen...
+        {tr(
+          '正在初始化 RcloneBrowser Next Gen...',
+          '正在初始化 RcloneBrowser Next Gen...',
+          'Initializing RcloneBrowser Next Gen...'
+        )}
       </div>
     );
   }
@@ -251,7 +265,13 @@ export const App: React.FC = () => {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-100">RcloneBrowser Next Gen</h1>
-              <p className="text-xs text-slate-400">容器已启用访问认证保护</p>
+              <p className="text-xs text-slate-400">
+                {tr(
+                  '容器已启用访问认证保护',
+                  '容器已啟用存取驗證保護',
+                  'Authentication is enabled for this container'
+                )}
+              </p>
             </div>
           </div>
 
@@ -263,7 +283,9 @@ export const App: React.FC = () => {
 
           <div className="space-y-3 text-xs">
             <div>
-              <label className="block text-slate-400 mb-1">用户名 (APP_USERNAME)</label>
+              <label className="block text-slate-400 mb-1">
+                {tr('用户名 (APP_USERNAME)', '使用者名稱 (APP_USERNAME)', 'Username (APP_USERNAME)')}
+              </label>
               <input
                 type="text"
                 required
@@ -274,14 +296,20 @@ export const App: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-400 mb-1">访问密码 (APP_PASSWORD)</label>
+              <label className="block text-slate-400 mb-1">
+                {tr('访问密码 (APP_PASSWORD)', '存取密碼 (APP_PASSWORD)', 'Password (APP_PASSWORD)')}
+              </label>
               <input
                 type="password"
                 required
                 autoFocus
                 value={loginPass}
                 onChange={(e) => setLoginPass(e.target.value)}
-                placeholder="输入容器环境变量设置的密码"
+                placeholder={tr(
+                  '输入容器环境变量设置的密码',
+                  '輸入容器環境變數設定的密碼',
+                  'Enter password configured in container env'
+                )}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
               />
             </div>
@@ -291,7 +319,7 @@ export const App: React.FC = () => {
             type="submit"
             className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors"
           >
-            登录控制台
+            {tr('登录控制台', '登入控制台', 'Sign In')}
           </button>
         </form>
       </div>
@@ -309,11 +337,11 @@ export const App: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-white">
+              <h1 className="text-sm font-bold tracking-tight text-slate-100">
                 RcloneBrowser <span className="text-sky-400">Next Gen</span>
               </h1>
               <span className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] font-mono text-sky-300">
-                v2.0
+                v{displayAppVersion}
               </span>
             </div>
             <p className="text-[11px] text-slate-400 hidden sm:block">
@@ -333,7 +361,7 @@ export const App: React.FC = () => {
             }`}
           >
             <FolderTree className="w-4 h-4" />
-            <span>文件管理器</span>
+            <span>{tr('文件管理器', '檔案管理員', 'Explorer')}</span>
           </button>
 
           <button
@@ -345,7 +373,7 @@ export const App: React.FC = () => {
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>传输与同步中心</span>
+            <span>{tr('传输与同步中心', '傳輸與同步中心', 'Transfers')}</span>
             {activeTasksCount > 0 ? (
               <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold animate-pulse">
                 {activeTasksCount}
@@ -366,7 +394,7 @@ export const App: React.FC = () => {
             }`}
           >
             <Cloud className="w-4 h-4" />
-            <span>存储源配置 (Remotes)</span>
+            <span>{tr('存储源配置 (Remotes)', '儲存源設定 (Remotes)', 'Remotes')}</span>
             <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 text-[10px]">
               {remotes.length}
             </span>
@@ -381,7 +409,7 @@ export const App: React.FC = () => {
             }`}
           >
             <CalendarClock className="w-4 h-4" />
-            <span>定时任务 (Cron)</span>
+            <span>{tr('定时任务 (Cron)', '排程任務 (Cron)', 'Scheduler')}</span>
             {enabledSchedulesCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px]">
                 {enabledSchedulesCount}
@@ -390,7 +418,7 @@ export const App: React.FC = () => {
           </button>
         </nav>
 
-        {/* Right Controls */}
+        {/* Right Controls: Dual-Pane Toggle, Theme Selector, Language Selector, Logout */}
         <div className="flex items-center gap-2">
           {activeNav === 'explorer' && (
             <button
@@ -400,17 +428,59 @@ export const App: React.FC = () => {
                   ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
                   : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
-              title="切换双栏 Commander 对比视图 / 单栏视图"
+              title={tr(
+                '切换双栏 Commander 对比视图 / 单栏视图',
+                '切換雙欄 Commander 對比檢視 / 單欄檢視',
+                'Toggle Dual-Pane Commander / Single-Pane View'
+              )}
             >
               {dualPane ? <Columns className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              <span>{dualPane ? '双栏 Commander 模式' : '单栏浏览模式'}</span>
+              <span className="hidden xl:inline">
+                {dualPane
+                  ? tr('双栏 Commander', '雙欄 Commander', 'Dual-Pane')
+                  : tr('单栏浏览', '單欄瀏覽', 'Single-Pane')}
+              </span>
             </button>
           )}
+
+          {/* Theme Selector */}
+          <div className="relative flex items-center">
+            <Palette className="w-3.5 h-3.5 text-sky-400 absolute left-2.5 pointer-events-none" />
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as ThemeId)}
+              title={tr('切换界面风格主题', '切換介面風格主題', 'Switch UI Theme')}
+              className="bg-slate-950 border border-slate-800 hover:border-sky-500/50 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+            >
+              {THEME_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {tr(opt.zhCN, opt.zhTW, opt.en)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Language Selector */}
+          <div className="relative flex items-center">
+            <Globe className="w-3.5 h-3.5 text-emerald-400 absolute left-2.5 pointer-events-none" />
+            <select
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as LocaleCode)}
+              title={tr('切换语言', '切換語言', 'Switch Language')}
+              className="bg-slate-950 border border-slate-800 hover:border-sky-500/50 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+            >
+              {LOCALE_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {authRequired && (
             <button
               onClick={handleLogout}
-              title="退出登录"
+              title={tr('退出登录', '登出', 'Sign Out')}
               className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-rose-400"
             >
               <LogOut className="w-4 h-4" />
@@ -506,29 +576,25 @@ export const App: React.FC = () => {
 
       {/* Bottom Live Status Bar */}
       <footer className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-slate-900 border-t border-slate-800/90 text-[11px] text-slate-400 shrink-0">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5">
             <span
               className={`w-2 h-2 rounded-full ${
                 systemStatus?.rcloneAvailable ? 'bg-emerald-400' : 'bg-amber-400'
               }`}
             />
-            <strong className="text-slate-200">
-              Rclone {systemStatus?.rcloneVersion || '检测中...'}
+            <strong className="text-slate-200 font-mono">
+              Rclone {systemStatus?.rcloneVersion || '...'}
+              {systemStatus?.rcloneUpdateAvailable && systemStatus?.rcloneLatestVersion ? (
+                <>
+                  <span className="text-slate-400 mx-1">/</span>
+                  <span className="text-amber-300">{systemStatus.rcloneLatestVersion}</span>
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 text-white text-[10px] font-extrabold tracking-wide shadow-sm">
+                    (new)
+                  </span>
+                </>
+              ) : null}
             </strong>
-            {systemStatus?.arch && (
-              <span className="text-slate-500">({systemStatus.arch})</span>
-            )}
-          </span>
-
-          <span className="hidden md:flex items-center gap-1 text-slate-500">
-            <Terminal className="w-3 h-3" />
-            <span>配置卷: {systemStatus?.configPath || '/config/rclone/rclone.conf'}</span>
-          </span>
-
-          <span className="hidden lg:flex items-center gap-1 text-slate-500">
-            <HardDrive className="w-3 h-3" />
-            <span>数据卷: {systemStatus?.mediaDir || '/media'}</span>
           </span>
         </div>
 
@@ -540,18 +606,18 @@ export const App: React.FC = () => {
             >
               <Activity className="w-3.5 h-3.5 animate-pulse" />
               <span>
-                正在执行 {activeTasksCount} 项任务 ({formatSpeed(totalSpeed)})
+                {tr(
+                  `正在执行 ${activeTasksCount} 项任务 (${formatSpeed(totalSpeed)})`,
+                  `正在執行 ${activeTasksCount} 項任務 (${formatSpeed(totalSpeed)})`,
+                  `${activeTasksCount} active task(s) (${formatSpeed(totalSpeed)})`
+                )}
               </span>
             </button>
           )}
 
-          <span className="font-mono text-slate-500">
-            限速: {globalBwLimit === 'off' ? '无限制' : globalBwLimit}
-          </span>
-
-          <span className="hidden sm:inline-flex items-center gap-1 text-slate-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>PUID:{systemStatus?.puid || '1000'} / PGID:{systemStatus?.pgid || '1000'}</span>
+          <span className="font-mono text-slate-400">
+            {tr('限速', '限速', 'BW Limit')}:{' '}
+            {globalBwLimit === 'off' ? tr('无限制', '無限制', 'Unlimited') : globalBwLimit}
           </span>
         </div>
       </footer>

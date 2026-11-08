@@ -185,6 +185,16 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  pauseTask: (id: string) =>
+    requestJson<{ task: TransferTask }>(`/api/tasks/${encodeURIComponent(id)}/pause`, {
+      method: 'POST',
+    }),
+
+  resumeTask: (id: string) =>
+    requestJson<{ task: TransferTask }>(`/api/tasks/${encodeURIComponent(id)}/resume`, {
+      method: 'POST',
+    }),
+
   cancelTask: (id: string) =>
     requestJson<{ task: TransferTask }>(`/api/tasks/${encodeURIComponent(id)}/cancel`, {
       method: 'POST',

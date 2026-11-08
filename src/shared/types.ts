@@ -1,6 +1,12 @@
 export type TransferOperation = 'copy' | 'move' | 'sync' | 'check';
 
-export type TaskStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type TaskStatus =
+  | 'queued'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export interface RemoteConfigParams {
   [key: string]: string;
@@ -124,6 +130,8 @@ export interface SystemStatus {
   appName: string;
   appVersion: string;
   rcloneVersion: string;
+  rcloneLatestVersion?: string;
+  rcloneUpdateAvailable?: boolean;
   rcloneAvailable: boolean;
   osInfo: string;
   arch: string;

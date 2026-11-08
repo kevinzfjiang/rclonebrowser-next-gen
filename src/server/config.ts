@@ -20,6 +20,36 @@ function resolveDefaultDir(envVal: string | undefined, dockerDefault: string, de
   return path.resolve(process.cwd(), devFallback);
 }
 
+function loadAppVersion(): { name: string; version: string } {
+  const candidates = [
+    path.resolve(process.cwd(), 'version.json'),
+    path.resolve(process.cwd(), 'package.json'),
+  ];
+  for (const file of candidates) {
+    try {
+      if (fs.existsSync(file)) {
+        const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
+        if (parsed.version) {
+          return {
+            name: parsed.name || 'RcloneBrowser Next Gen',
+            version: String(process.env.APP_VERSION || parsed.version),
+          };
+        }
+      }
+    } catch {
+      // Ignore parse errors and try next candidate
+    }
+  }
+  return {
+    name: 'RcloneBrowser Next Gen',
+    version: process.env.APP_VERSION || '2.1',
+  };
+}
+
+const versionMeta = loadAppVersion();
+export const APP_NAME = versionMeta.name;
+export const APP_VERSION = versionMeta.version;
+
 export const CONFIG_DIR = resolveDefaultDir(process.env.CONFIG_DIR, '/config', './data/config');
 export const MEDIA_DIR = resolveDefaultDir(process.env.MEDIA_DIR, '/media', './data/media');
 export const RCLONE_CONFIG_PATH = process.env.RCLONE_CONFIG
@@ -117,8 +147,8 @@ export function ensureDirectoriesAndDefaults(): void {
           '',
           '## Key Features',
           '- **Dual-Pane Commander & Multi-Tab Explorer**: Browse local `/media` and any Rclone cloud remote side-by-side.',
-          '- **Transfer & Sync Center**: Real-time `copy`, `move`, and `sync` task queue with live speed, progress & logs.',
-          '- **Remote Wizard & Config Editor**: Configure S3, Cloudflare R2, WebDAV, SFTP, SMB, Google Drive, OneDrive, Crypt & more.',
+          '- **Transfer & Sync Center**: Real-time `copy`, `move`, and `sync` task queue with pause/resume, live speed, progress & logs.',
+          '- **Remote Wizard & Per-Remote Proxy**: Configure S3, Cloudflare R2, WebDAV, SFTP, SMB, Google Drive, OneDrive, Crypt & per-remote proxy.',
           '- **Cron Scheduler**: Automate periodic cloud backup and sync jobs.',
           '',
           `Configuration Path: \`${RCLONE_CONFIG_PATH}\``,
@@ -132,6 +162,7 @@ export function ensureDirectoriesAndDefaults(): void {
         JSON.stringify(
           {
             project: 'RcloneBrowser Next Gen',
+            version: APP_VERSION,
             architecture: 'Native Web UI + Rclone Engine + Alpine Docker',
             volumes: {
               config: '/config',

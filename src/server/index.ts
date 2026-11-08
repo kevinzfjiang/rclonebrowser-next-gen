@@ -5,8 +5,10 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import {
+  APP_NAME,
   APP_PASSWORD,
   APP_USERNAME,
+  APP_VERSION,
   CONFIG_DIR,
   ensureDirectoriesAndDefaults,
   MEDIA_DIR,
@@ -114,9 +116,11 @@ app.get('/api/system/status', async (_req: Request, res: Response) => {
     const activeStats = taskManager.getActiveStats();
 
     const status: SystemStatus = {
-      appName: 'RcloneBrowser Next Gen',
-      appVersion: '2.0.0',
+      appName: APP_NAME,
+      appVersion: APP_VERSION,
       rcloneVersion: rcloneInfo.version,
+      rcloneLatestVersion: rcloneInfo.latestVersion,
+      rcloneUpdateAvailable: rcloneInfo.updateAvailable,
       rcloneAvailable: rcloneInfo.available,
       osInfo: rcloneInfo.osInfo,
       arch: rcloneInfo.arch,
@@ -420,6 +424,24 @@ app.post('/api/tasks', (req: Request, res: Response) => {
 app.post('/api/tasks/clear-completed', (_req: Request, res: Response) => {
   taskManager.clearCompletedTasks();
   res.json({ tasks: taskManager.getTasks() });
+});
+
+app.post('/api/tasks/:id/pause', (req: Request, res: Response) => {
+  try {
+    const task = taskManager.pauseTask(String(req.params.id));
+    res.json({ task });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/tasks/:id/resume', (req: Request, res: Response) => {
+  try {
+    const task = taskManager.resumeTask(String(req.params.id));
+    res.json({ task });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/tasks/:id/cancel', (req: Request, res: Response) => {

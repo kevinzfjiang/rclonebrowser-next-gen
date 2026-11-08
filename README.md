@@ -1,65 +1,71 @@
 # RcloneBrowser Next Gen 🚀
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
+[![Version](https://img.shields.io/badge/version-2.1-0284c7.svg)](./version.json)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
-**RcloneBrowser Next Gen** 是对传统 [kevinzfjiang/dockerfile/rclonebrowser](https://github.com/kevinzfjiang/dockerfile/blob/master/rclonebrowser/Dockerfile) 容器的彻底现代化重构。
+> 📖 **Documentation**: **English** | **[简体中文文档 (README_CN.md)](./README_CN.md)**
 
-彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
+**RcloneBrowser Next Gen** is a ground-up, modern native Web GUI replacement for the legacy [rclonebrowser Docker container](https://github.com/kevinzfjiang/dockerfile/blob/master/rclonebrowser/Dockerfile).
 
-- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `1.0.0`)
-- 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
+Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over the browser, **RcloneBrowser Next Gen** is built with **React + TypeScript + Tailwind CSS + Node.js** on top of the **official Rclone engine**, packaged into a lightweight Alpine Docker image while maintaining **100% drop-in compatibility** with legacy `/config` and `/media` volumes and port `5800`.
+
+- 🐳 **Docker Hub**: [`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
+- 📦 **GitHub Repository**: [kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
-## ✨ 为什么升级到 RcloneBrowser Next Gen？
+## ✨ Why Upgrade to RcloneBrowser Next Gen?
 
-| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | RcloneBrowser Next Gen (`v2.0`) |
+| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.1`)** |
 | :--- | :--- | :--- |
-| **交互体验** | 基于 X11/noVNC 远程桌面视频流，高延迟、字体发虚、移动端无法操作 | **原生响应式 Web 界面**，60fps 丝滑交互，支持拖拽上传、在线预览、双栏对比 |
-| **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译 Rclone + 轻量 Node.js 服务**，零 X11/Qt5 依赖，构建快速稳定 |
-| **资源占用** | 闲置内存 ~350MB - 500MB | **闲置内存 ~40MB** |
-| **功能扩展** | 仅限桌面版基础窗口 | 内置 **双栏多标签 Commander、实时任务队列、可视化配置向导、Cron 定时同步** |
-| **旧版兼容性** | `/config`、`/media`、端口 `5800` | **完全兼容**，启动时自动检测并迁移旧版 `/config/xdg/config/rclone/rclone.conf` |
+| **UI Experience** | X11/noVNC remote desktop video stream; blurry fonts, high latency, unusable on mobile | **Native 60fps Web UI** with drag-and-drop upload, inline preview, 5 themes & 3 languages |
+| **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + lightweight Node.js API**; zero X11/Qt5 bloat |
+| **Memory Footprint** | ~350MB - 500MB idle | **~40MB idle** |
+| **Core Capabilities** | Basic desktop window | **Dual-Pane Commander, Pause/Resume Task Queue, Per-Remote Proxy, Cron Scheduler** |
+| **Drop-in Compatibility** | `/config`, `/media`, port `5800` | **100% compatible**; auto-migrates legacy `/config/xdg/config/rclone/rclone.conf` on startup |
 
 ---
 
-## 🛠️ 核心功能
+## 🛠️ Key Features (v2.1)
 
-1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
-   - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。
-   - 内置本地数据卷 `@media` (`/media`)、多挂载点 (`LOCAL_MOUNTS`) 与任意云端 Remote 同屏浏览。
-   - 支持 **拖拽上传文件**、**在线直接预览**（文本、代码、Markdown、JSON、图片、音视频）、文件流式下载、新建文件夹、重命名、批量删除、文件夹大小统计 (`rclone size`)。
-   - 双栏一键 **复制到对侧 (`Copy →`)**、**移动到对侧 (`Move →`)**、**镜像同步目录 (`Sync ⇄`)**。
-2. **传输与同步任务中心 (`Transfers & Sync Center`)**
-   - 支持 `Copy`、`Sync`、`Move`、`Check` 异步任务队列。
-   - 解析 `rclone --use-json-log --stats 500ms` 实时流，展示 **总体进度条、实时传输速率 (MB/s)、剩余时间 (ETA)、正在传输的子文件列表**。
-   - 支持随时调整 **全局带宽限速 (`--bwlimit`)**、取消运行中任务、失败重试，以及展开查看 **Rclone 实时终端日志**。
-3. **可视化 Remote 存储源管理 & 独立代理绑定 (`Remotes & Per-Remote Proxy`)**
-   - **支持每个 Remote 独立绑定代理或直连**：
-     - 完美解决中国大陆环境下不同网盘需要不同网络出口的痛点（例如：`Google Drive A` 绑定 `socks5://192.168.1.2:1080`，`Google Drive B` 绑定 `http://192.168.1.2:7890`，`OneDrive` / 阿里云盘 / 本地 NAS 保持 `直连无代理`）。
-     - 即使在两个配置了**不同代理**（或一个走代理、一个走直连）的网盘之间直接对传，系统也会自动启动**双进程本地回环桥接 (`127.0.0.1`)**，确保源端和目标端各自严格走自己的代理通道，互不干扰！
-   - 内置主流存储协议可视化创建/编辑向导：
-     - **S3 兼容对象存储**（AWS S3、Cloudflare R2、MinIO、阿里云 OSS、腾讯云 COS、Backblaze B2）
-     - **WebDAV**（Alist、OpenList、Nextcloud、OwnCloud、群晖 NAS）
-     - **SFTP / SSH**、**SMB / CIFS 局域网共享**、**FTP**
-     - **Google Drive**、**Microsoft OneDrive**（含世纪互联版）
-     - **Alias 本地/远端路径映射**、**Crypt 端到端加密层**（自动继承底层 Remote 的代理配置）
-   - 保存时自动调用 `rclone obscure` 对明文密码进行安全加密。
-   - 内置 **`rclone.conf` 源文件在线编辑器**，支持一键导入/导出备份配置文件，以及 `rclone about` 容量测速。
-4. **Cron 定时同步调度器 (`Cron Scheduler`)**
-   - 在 Web 界面中配置周期性自动备份/同步任务（提供常用周期预设与自定义 5 段式 Cron 表达式）。
-   - 支持随时启停、查看下次执行时间与历史状态，以及点击 **“立即运行一次”** 手动触发。
+1. **Multi-Tab & Dual-Pane Commander File Explorer (`Explorer`)**
+   - Switch between **Dual-Pane Commander** and **Single-Pane** layouts with independent multi-tab bars per pane.
+   - Browse built-in `/media`, custom NAS mounts (`LOCAL_MOUNTS`), and any cloud Remote side-by-side.
+   - Drag-and-drop file upload, **inline browser preview** (Text, Code, Markdown, JSON, Images, Video, Audio), streaming download, mkdir, rename, batch delete, and folder size calculation (`rclone size`).
+   - One-click **Copy →**, **Move →**, and **Sync Dir ⇄** between panes.
+
+2. **Transfer & Sync Task Center with Pause / Resume (`Transfers`)**
+   - Asynchronous task queue supporting `Copy`, `Sync`, `Move`, and `Check`.
+   - Real-time progress bars, transfer speed (MB/s), ETA, active file sub-progress, and expandable **Rclone live terminal log console**.
+   - Full support for **Pause**, **Resume**, **Cancel**, **Retry**, and on-the-fly **Global Bandwidth Limit (`--bwlimit`)**.
+
+3. **Visual Remote Wizard & Per-Remote Proxy Isolation (`Remotes`)**
+   - **Per-Remote Network Proxy**: Bind an independent `HTTP`, `HTTPS`, or `SOCKS5` proxy (or force `Direct / No Proxy`) to each individual Remote!
+     - Example: `Google Drive A` → `socks5://192.168.1.2:1080`, `Google Drive B` → `http://192.168.1.2:7890`, `OneDrive` → `Direct (No Proxy)`.
+     - **Dual-Process Loopback Bridge**: Even when transferring directly between two remotes with *different* proxies (e.g., `Google Drive A` → `OneDrive`), the server automatically spawns an isolated local loopback bridge (`127.0.0.1`) so each remote strictly uses its own proxy!
+   - Built-in visual templates for **Amazon S3 / Cloudflare R2 / MinIO / Alibaba OSS / Tencent COS**, **WebDAV (Alist / Nextcloud / Synology)**, **SFTP / SSH**, **SMB / CIFS**, **FTP**, **Google Drive**, **Microsoft OneDrive**, **Alias**, and **Crypt** (with automatic `rclone obscure` password encryption).
+   - Built-in **Raw `rclone.conf` Editor** with one-click Import and Export.
+
+4. **Cron Scheduled Sync & Backup (`Scheduler`)**
+   - Automate periodic `Copy`, `Sync`, or `Move` jobs using visual presets or custom 5-field Cron expressions.
+   - Enable/disable schedules anytime, inspect next/last run timestamps, or click **Run Now** to trigger immediately.
+
+5. **Multi-Theme & Multi-Language UI + Auto Rclone Version Check**
+   - **5 Built-in Themes**: `Slate Dark`, `Light Mode`, `Cyberpunk Neon`, `OLED Pure Black`, and `Nordic Frost`.
+   - **3 Languages**: `简体中文`, `繁體中文`, and `English`.
+   - **Automatic Rclone Update Detection**: Automatically checks official Rclone releases and highlights new versions in the bottom status bar (e.g. `Rclone v1.76.0 / v1.77.0 (new)`).
+   - **Configurable Version**: Managed centrally via [`version.json`](./version.json).
 
 ---
 
-## 🐳 Docker 快速部署指南
+## 🐳 Quick Start with Docker
 
-镜像已发布至 Docker Hub：`yadiman/rclonebrowser-next-gen:latest`（同时提供 `yadiman/rclonebrowser-next-gen:1.0.0`）。
+Docker Hub image: `yadiman/rclonebrowser-next-gen:latest`
 
-### 场景一：群晖 NAS (Synology Container Manager) 多挂载点部署
+### Option 1: Synology NAS (Container Manager) / Multi-Mount `docker-compose.yml`
 
-如果你在群晖上有多个跨存储池目录（例如 `/volume3/NAS`、`/volume1/NAS2`、`/volume2/homes/kevin/Photos`），推荐统一挂载到 `/media/` 子目录下，并配置 `LOCAL_MOUNTS` 环境变量以便在界面下拉框一键直达：
+If you have multiple folders across different Synology volumes (e.g., `/volume3/NAS`, `/volume1/NAS2`, `/volume2/homes/kevin/Photos`), mount them under `/media/` and register them in `LOCAL_MOUNTS` for one-click dropdown access:
 
 ```yaml
 services:
@@ -70,15 +76,14 @@ services:
     ports:
       - "5800:5800"
     environment:
-      # 群晖 DSM 7 的 /volume1/docker 默认有 ACL 权限限制，设为 0:0 可直接读写所有挂载卷
-      # (若想使用 PUID=1026，需在群晖“控制面板 -> 共享文件夹 -> docker -> 编辑 -> 权限”中勾选该用户的可读写权限)
+      # On Synology DSM 7+, /volume1/docker has ACL restrictions; 0:0 ensures full read/write access
       - PUID=0
       - PGID=0
       - TZ=Asia/Shanghai
       - PORT=5800
-      # 将多个本地挂载点注册为独立下拉存储源（在文件管理器下拉菜单一键直达）
+      # Register multiple local mounts as standalone dropdown items in the Explorer
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
-      # 可选：设置 Web 登录密码（留空则内网免密直接进入）
+      # Optional: Set Web UI login password (leave APP_PASSWORD empty for passwordless access)
       - APP_USERNAME=admin
       - APP_PASSWORD=
     volumes:
@@ -88,17 +93,17 @@ services:
       - /volume2/homes/kevin/Photos:/media/Photos
 ```
 
-启动命令：
+Start the container:
 
 ```bash
 docker compose up -d
 ```
 
-浏览器访问：`http://你的群晖IP:5800`
+Open in your browser: `http://<your-nas-ip>:5800`
 
 ---
 
-### 场景二：通用 Linux 单目录快速启动 (`docker run`)
+### Option 2: Standard Linux `docker run`
 
 ```bash
 docker run -d \
@@ -117,48 +122,43 @@ docker run -d \
 
 ---
 
-## ⚙️ 环境变量说明
+## ⚙️ Environment Variables
 
-| 变量名 | 默认值 | 说明 |
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PORT` | `5800` | Web GUI 监听端口（默认兼容旧版 `5800`） |
-| `PUID` | `1000` | 运行进程的用户 UID（群晖管理员通常为 `1026`），解决挂载卷文件权限问题 |
-| `PGID` | `1000` | 运行进程的用户组 GID（群晖 `users` 组通常为 `100`） |
-| `TZ` | `Asia/Shanghai` | 容器时区（影响日志时间与 Cron 定时任务触发时间） |
-| `LOCAL_MOUNTS` | *(空)* | 额外多挂载点快捷注册，格式如：`NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos` |
-| `APP_USERNAME` | `admin` | Web 控制台登录用户名 |
-| `APP_PASSWORD` | *(空)* | Web 控制台登录密码。若留空则免密直接访问；若设置则强制要求登录 |
-| `CONFIG_DIR` | `/config` | 配置文件与任务数据持久化目录 |
-| `MEDIA_DIR` | `/media` | 本地数据卷主挂载目录 |
+| `PORT` | `5800` | Web GUI listening port (matches legacy `5800`) |
+| `PUID` | `1000` | Process UID (`0` recommended on Synology DSM 7+ if `/volume1/docker` ACLs are restricted) |
+| `PGID` | `1000` | Process GID |
+| `TZ` | `Asia/Shanghai` | Container timezone (used for logs and Cron schedules) |
+| `LOCAL_MOUNTS` | *(empty)* | Comma-separated shortcut mounts, e.g. `NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos` |
+| `APP_USERNAME` | `admin` | Web UI login username |
+| `APP_PASSWORD` | *(empty)* | Web UI login password. If empty, authentication is bypassed; if set, login is required |
+| `CONFIG_DIR` | `/config` | Persistent configuration and task database directory |
+| `MEDIA_DIR` | `/media` | Primary local data mount directory |
 
 ---
 
-## 💻 从源码编译与本地开发
+## 💻 Building from Source & Local Development
 
-### 1. 手动编译并推送 Docker 镜像
+### 1. Build & Push Docker Image
 
 ```bash
 git clone https://github.com/kevinzfjiang/rclonebrowser-next-gen.git
 cd rclonebrowser-next-gen
 
-docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:1.0.0 .
+docker build -t yadiman/rclonebrowser-next-gen:latest -t yadiman/rclonebrowser-next-gen:2.1 .
 docker push yadiman/rclonebrowser-next-gen:latest
-docker push yadiman/rclonebrowser-next-gen:1.0.0
+docker push yadiman/rclonebrowser-next-gen:2.1
 ```
 
-### 2. 本地 Node.js 开发调试
+### 2. Local Node.js Development
 
-本地需安装 `Node.js >= 20` 与 `rclone` CLI：
+Requires `Node.js >= 20` and `rclone` CLI installed locally:
 
 ```bash
-# 安装依赖
 npm install
-
-# 启动开发模式 (同时启动后端 5800 与前端 Vite 热重载 5173)
-npm run dev
-
-# 生产环境打包与测试
-npm run build
-npm test
-npm start
+npm run dev     # Starts Express backend (:5800) + Vite HMR frontend (:5173)
+npm run build   # Builds production frontend and backend
+npm test        # Runs integration smoke tests against Rclone
+npm start       # Starts production server on port 5800
 ```

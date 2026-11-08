@@ -10,7 +10,7 @@ FROM node:22-alpine AS builder
 
 WORKDIR /build
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* version.json ./
 RUN npm install
 
 COPY tsconfig.json tsconfig.server.json vite.config.ts tailwind.config.js postcss.config.js index.html ./
@@ -67,8 +67,9 @@ RUN apk update && \
 
 WORKDIR /app
 
-# Copy compiled artifacts and production node_modules from builder
+# Copy compiled artifacts, version.json, and production node_modules from builder
 COPY --from=builder /build/package.json ./package.json
+COPY --from=builder /build/version.json ./version.json
 COPY --from=builder /build/node_modules ./node_modules
 COPY --from=builder /build/dist ./dist
 
@@ -87,7 +88,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 LABEL org.opencontainers.image.title="RcloneBrowser Next Gen" \
       org.opencontainers.image.description="Modern Native Web GUI for Rclone in Docker" \
-      org.opencontainers.image.version="2.0.0" \
-      org.opencontainers.image.source="https://github.com/kevinzfjiang/dockerfile"
+      org.opencontainers.image.version="2.1" \
+      org.opencontainers.image.source="https://github.com/kevinzfjiang/rclonebrowser-next-gen"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

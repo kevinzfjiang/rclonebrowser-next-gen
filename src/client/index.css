@@ -2,9 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+[data-theme="slate"] {
+  --slate-50: 248 250 252;
+  --slate-100: 241 245 249;
+  --slate-200: 226 232 240;
+  --slate-300: 203 213 225;
+  --slate-400: 148 163 184;
+  --slate-500: 100 116 139;
+  --slate-600: 71 85 105;
+  --slate-700: 51 65 85;
+  --slate-800: 30 41 59;
+  --slate-900: 15 23 42;
+  --slate-950: 2 6 23;
+
+  --sky-200: 186 230 253;
+  --sky-300: 125 211 252;
+  --sky-400: 56 189 248;
+  --sky-500: 14 165 233;
+  --sky-600: 2 132 199;
+  --sky-700: 3 105 161;
+  --sky-800: 7 89 133;
+  --sky-900: 12 74 110;
+  --sky-950: 8 47 73;
+}
+
+/* Light Mode */
+[data-theme="light"] {
+  --slate-50: 15 23 42;
+  --slate-100: 15 23 42;
+  --slate-200: 30 41 59;
+  --slate-300: 51 65 85;
+  --slate-400: 71 85 105;
+  --slate-500: 100 116 139;
+  --slate-600: 148 163 184;
+  --slate-700: 203 213 225;
+  --slate-800: 226 232 240;
+  --slate-900: 255 255 255;
+  --slate-950: 241 245 249;
+
+  --sky-200: 7 89 133;
+  --sky-300: 3 105 161;
+  --sky-400: 2 132 199;
+  --sky-500: 14 165 233;
+  --sky-600: 2 132 199;
+  --sky-700: 3 105 161;
+  --sky-800: 186 230 253;
+  --sky-900: 224 242 254;
+  --sky-950: 240 249 255;
+}
+
+/* OLED Pure Black Mode */
+[data-theme="oled"] {
+  --slate-50: 250 250 250;
+  --slate-100: 244 244 245;
+  --slate-200: 228 228 231;
+  --slate-300: 212 212 216;
+  --slate-400: 161 161 170;
+  --slate-500: 113 113 122;
+  --slate-600: 63 63 70;
+  --slate-700: 39 39 42;
+  --slate-800: 24 24 27;
+  --slate-900: 9 9 11;
+  --slate-950: 0 0 0;
+
+  --sky-200: 186 230 253;
+  --sky-300: 125 211 252;
+  --sky-400: 56 189 248;
+  --sky-500: 14 165 233;
+  --sky-600: 2 132 199;
+  --sky-700: 3 105 161;
+  --sky-800: 7 89 133;
+  --sky-900: 12 74 110;
+  --sky-950: 8 47 73;
+}
+
+/* Cyberpunk Neon Mode */
+[data-theme="cyberpunk"] {
+  --slate-50: 253 244 255;
+  --slate-100: 250 232 255;
+  --slate-200: 240 210 255;
+  --slate-300: 224 176 255;
+  --slate-400: 192 132 252;
+  --slate-500: 147 51 234;
+  --slate-600: 107 33 168;
+  --slate-700: 88 28 135;
+  --slate-800: 59 7 100;
+  --slate-900: 22 6 44;
+  --slate-950: 10 2 22;
+
+  --sky-200: 165 243 252;
+  --sky-300: 34 211 238;
+  --sky-400: 0 245 212;
+  --sky-500: 247 37 133;
+  --sky-600: 219 39 119;
+  --sky-700: 190 24 93;
+  --sky-800: 131 24 67;
+  --sky-900: 80 7 36;
+  --sky-950: 46 4 24;
+}
+
+/* Nordic Ocean Mode */
+[data-theme="nord"] {
+  --slate-50: 236 239 244;
+  --slate-100: 229 233 240;
+  --slate-200: 216 222 233;
+  --slate-300: 180 190 206;
+  --slate-400: 143 158 181;
+  --slate-500: 108 122 147;
+  --slate-600: 76 86 106;
+  --slate-700: 67 76 94;
+  --slate-800: 59 66 82;
+  --slate-900: 46 52 64;
+  --slate-950: 36 41 51;
+
+  --sky-200: 143 188 187;
+  --sky-300: 136 192 208;
+  --sky-400: 136 192 208;
+  --sky-500: 129 161 193;
+  --sky-600: 94 129 172;
+  --sky-700: 76 106 145;
+  --sky-800: 59 83 116;
+  --sky-900: 46 64 90;
+  --sky-950: 32 45 64;
+}
+
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 overflow-hidden select-none;
+    @apply bg-slate-950 text-slate-100 overflow-hidden select-none transition-colors duration-200;
   }
 }
 
@@ -15,14 +140,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgb(var(--slate-900) / 0.6);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.7);
+  background: rgb(var(--slate-600) / 0.7);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.7);
+  background: rgb(var(--sky-400) / 0.8);
 }

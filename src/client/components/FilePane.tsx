@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown,
   ArrowLeftRight,
-  ArrowRight,
   ArrowUp,
   Calculator,
   CheckSquare,
@@ -36,6 +35,7 @@ import {
 } from 'lucide-react';
 import { FileEntry, RemoteInfo, StorageQuota, TransferOperation } from '../../shared/types';
 import { api } from '../api';
+import { useI18n } from '../i18n';
 import { formatBytes, formatDateTime } from '../utils/format';
 
 export interface ExplorerTab {
@@ -77,6 +77,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
   onNotify,
   refreshSignal,
 }) => {
+  const { tr } = useI18n();
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || tabs[0],
     [tabs, activeTabId]
@@ -122,7 +123,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
       const res = await api.listDirectory(activeTab.remote, activeTab.path);
       setEntries(res.entries || []);
     } catch (err: any) {
-      setError(err.message || '无法加载目录');
+      setError(err.message || tr('无法加载目录', '無法載入目錄', 'Failed to load directory'));
       setEntries([]);
     } finally {
       setLoading(false);
@@ -239,10 +240,16 @@ export const FilePane: React.FC<FilePaneProps> = ({
       await api.makeDirectory(activeTab.remote, targetPath);
       setNewFolderModal(false);
       setNewFolderName('');
-      onNotify(`已创建目录: ${cleanName}`, 'success');
+      onNotify(
+        tr(`已创建目录: ${cleanName}`, `已建立目錄: ${cleanName}`, `Created folder: ${cleanName}`),
+        'success'
+      );
       loadDirectory();
     } catch (err: any) {
-      onNotify(err.message || '创建目录失败', 'error');
+      onNotify(
+        err.message || tr('创建目录失败', '建立目錄失敗', 'Failed to create folder'),
+        'error'
+      );
     }
   };
 
@@ -261,10 +268,17 @@ export const FilePane: React.FC<FilePaneProps> = ({
     try {
       await api.renameEntry(activeTab.remote, renameTarget.Path, newPath);
       setRenameTarget(null);
-      onNotify(`已重命名为: ${cleanNewName}`, 'success');
+      onNotify(
+        tr(
+          `已重命名为: ${cleanNewName}`,
+          `已重新命名為: ${cleanNewName}`,
+          `Renamed to: ${cleanNewName}`
+        ),
+        'success'
+      );
       loadDirectory();
     } catch (err: any) {
-      onNotify(err.message || '重命名失败', 'error');
+      onNotify(err.message || tr('重命名失败', '重新命名失敗', 'Rename failed'), 'error');
     }
   };
 
@@ -272,8 +286,16 @@ export const FilePane: React.FC<FilePaneProps> = ({
     if (itemsToDelete.length === 0) return;
     const confirmMsg =
       itemsToDelete.length === 1
-        ? `确定要删除 "${itemsToDelete[0].Name}" 吗？此操作不可撤销。`
-        : `确定要批量删除选中的 ${itemsToDelete.length} 个项目吗？此操作不可撤销。`;
+        ? tr(
+            `确定要删除 "${itemsToDelete[0].Name}" 吗？此操作不可撤销。`,
+            `確定要刪除 "${itemsToDelete[0].Name}" 嗎？此操作無法復原。`,
+            `Are you sure you want to delete "${itemsToDelete[0].Name}"? This cannot be undone.`
+          )
+        : tr(
+            `确定要批量删除选中的 ${itemsToDelete.length} 个项目吗？此操作不可撤销。`,
+            `確定要批次刪除選取的 ${itemsToDelete.length} 個項目嗎？此操作無法復原。`,
+            `Are you sure you want to delete ${itemsToDelete.length} selected items?`
+          );
     if (!window.confirm(confirmMsg)) return;
 
     try {
@@ -281,10 +303,17 @@ export const FilePane: React.FC<FilePaneProps> = ({
         activeTab.remote,
         itemsToDelete.map((i) => ({ path: i.Path, isDir: i.IsDir }))
       );
-      onNotify(`已删除 ${itemsToDelete.length} 个项目`, 'success');
+      onNotify(
+        tr(
+          `已删除 ${itemsToDelete.length} 个项目`,
+          `已刪除 ${itemsToDelete.length} 個項目`,
+          `Deleted ${itemsToDelete.length} item(s)`
+        ),
+        'success'
+      );
       loadDirectory();
     } catch (err: any) {
-      onNotify(err.message || '删除失败', 'error');
+      onNotify(err.message || tr('删除失败', '刪除失敗', 'Delete failed'), 'error');
     }
   };
 
@@ -293,9 +322,19 @@ export const FilePane: React.FC<FilePaneProps> = ({
     try {
       const res = await api.calculateDirSize(activeTab.remote, entry.Path);
       setDirSizes((prev) => ({ ...prev, [entry.Path]: res.bytes }));
-      onNotify(`目录 "${entry.Name}" 共包含 ${res.count} 个文件，大小 ${formatBytes(res.bytes)}`, 'info');
+      onNotify(
+        tr(
+          `目录 "${entry.Name}" 共包含 ${res.count} 个文件，大小 ${formatBytes(res.bytes)}`,
+          `目錄 "${entry.Name}" 共包含 ${res.count} 個檔案，大小 ${formatBytes(res.bytes)}`,
+          `Folder "${entry.Name}" contains ${res.count} files (${formatBytes(res.bytes)})`
+        ),
+        'info'
+      );
     } catch (err: any) {
-      onNotify(err.message || '计算目录大小失败', 'error');
+      onNotify(
+        err.message || tr('计算目录大小失败', '計算目錄大小失敗', 'Failed to calculate folder size'),
+        'error'
+      );
     } finally {
       setCalculatingPath(null);
     }
@@ -306,10 +345,17 @@ export const FilePane: React.FC<FilePaneProps> = ({
     setUploading(true);
     try {
       const res = await api.uploadFiles(activeTab.remote, activeTab.path, files);
-      onNotify(`成功上传 ${res.count} 个文件`, 'success');
+      onNotify(
+        tr(
+          `成功上传 ${res.count} 个文件`,
+          `成功上傳 ${res.count} 個檔案`,
+          `Uploaded ${res.count} file(s) successfully`
+        ),
+        'success'
+      );
       loadDirectory();
     } catch (err: any) {
-      onNotify(err.message || '上传失败', 'error');
+      onNotify(err.message || tr('上传失败', '上傳失敗', 'Upload failed'), 'error');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -329,7 +375,11 @@ export const FilePane: React.FC<FilePaneProps> = ({
       if (
         !dryRun &&
         !window.confirm(
-          `确定要执行目录同步 (SYNC) 吗？\n源目录: ${srcLabel}\n目标目录: ${dstLabel}\n注意: Sync 会使目标目录与源目录保持一致（目标多余文件将被清理）。`
+          tr(
+            `确定要执行目录同步 (SYNC) 吗？\n源目录: ${srcLabel}\n目标目录: ${dstLabel}\n注意: Sync 会使目标目录与源目录保持一致（目标多余文件将被清理）。`,
+            `確定要執行目錄同步 (SYNC) 嗎？\n來源目錄: ${srcLabel}\n目標目錄: ${dstLabel}\n注意: Sync 會使目標目錄與來源目錄保持一致（目標多餘檔案將被清理）。`,
+            `Run directory SYNC?\nSource: ${srcLabel}\nDestination: ${dstLabel}\nNote: Sync makes destination identical to source (extra files in destination will be removed).`
+          )
         )
       ) {
         return;
@@ -346,7 +396,14 @@ export const FilePane: React.FC<FilePaneProps> = ({
     }
 
     if (selectedEntries.length === 0) {
-      onNotify('请先勾选要传输的文件或文件夹', 'info');
+      onNotify(
+        tr(
+          '请先勾选要传输的文件或文件夹',
+          '請先勾選要傳輸的檔案或資料夾',
+          'Please select files or folders to transfer first'
+        ),
+        'info'
+      );
       return;
     }
 
@@ -421,9 +478,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
           const isLocalMount = tab.remote.startsWith('@');
           const remoteLabel =
             tab.remote === '@media'
-              ? '本地 /media'
+              ? tr('本地 /media', '本機 /media', 'Local /media')
               : isLocalMount
-                ? `本地 ${tab.remote.slice(1)}`
+                ? `${tr('本地', '本機', 'Local')} ${tab.remote.slice(1)}`
                 : `${tab.remote}:`;
           return (
             <div
@@ -456,7 +513,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
         })}
         <button
           onClick={handleAddTab}
-          title="新建标签页"
+          title={tr('新建标签页', '新增分頁', 'New Tab')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors shrink-0 mb-1"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -475,23 +532,25 @@ export const FilePane: React.FC<FilePaneProps> = ({
             {remotes.map((r) => (
               <option key={r.name} value={r.name}>
                 {r.name === '@media'
-                  ? '💾 本地存储 (/media)'
+                  ? `💾 ${tr('本地存储 (/media)', '本機儲存 (/media)', 'Local Storage (/media)')}`
                   : r.name.startsWith('@')
-                    ? `💾 挂载点: ${r.name.slice(1)} (${r.rootPath || ''})`
+                    ? `💾 ${tr('挂载点', '掛載點', 'Mount')}: ${r.name.slice(1)} (${r.rootPath || ''})`
                     : `☁️ ${r.name}: (${r.type.toUpperCase()})${
-                        r.proxyUrl || r.params._proxy_url ? ' [🌐代理]' : ''
+                        r.proxyUrl || r.params._proxy_url
+                          ? ` [🌐${tr('代理', '代理', 'Proxy')}]`
+                          : ''
                       }`}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Up button */}
+        {/* Up directory button */}
         <button
           onClick={handleGoUp}
           disabled={!activeTab.path}
-          title="返回上级目录"
-          className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none"
+          title={tr('返回上级目录', '返回上層目錄', 'Go Up')}
+          className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-slate-100 hover:border-slate-700 disabled:opacity-40 disabled:pointer-events-none"
         >
           <ArrowUp className="w-3.5 h-3.5" />
         </button>
@@ -513,7 +572,11 @@ export const FilePane: React.FC<FilePaneProps> = ({
                 value={pathInputVal}
                 onChange={(e) => setPathInputVal(e.target.value)}
                 onBlur={() => setEditingPathInput(false)}
-                placeholder="输入子目录路径回车跳转..."
+                placeholder={tr(
+                  '输入子目录路径回车跳转...',
+                  '輸入子目錄路徑按 Enter 跳轉...',
+                  'Enter path and press Enter...'
+                )}
                 className="w-full bg-transparent text-xs font-mono text-slate-100 focus:outline-none"
               />
             </form>
@@ -524,14 +587,14 @@ export const FilePane: React.FC<FilePaneProps> = ({
                 setPathInputVal(activeTab.path);
                 setEditingPathInput(true);
               }}
-              title="双击可直接输入路径"
+              title={tr('双击可直接输入路径', '雙擊可直接輸入路徑', 'Double-click to type path')}
             >
               <button
                 onClick={() => handleNavigate('')}
                 className="flex items-center gap-1 text-slate-400 hover:text-sky-400 font-medium px-1 py-0.5 rounded"
               >
                 <Home className="w-3.5 h-3.5" />
-                <span>根目录</span>
+                <span>{tr('根目录', '根目錄', 'Root')}</span>
               </button>
               {breadcrumbs.map((bc) => (
                 <React.Fragment key={bc.path}>
@@ -551,7 +614,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
         {/* Quota Badge */}
         {quota && quota.supported && (quota.used !== undefined || quota.free !== undefined) && (
           <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-400">
-            <span>已用 {formatBytes(quota.used, 1)}</span>
+            <span>
+              {tr('已用', '已用', 'Used')} {formatBytes(quota.used, 1)}
+            </span>
             {quota.total ? <span>/ {formatBytes(quota.total, 1)}</span> : null}
           </div>
         )}
@@ -559,7 +624,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
         {/* Refresh */}
         <button
           onClick={loadDirectory}
-          title="刷新目录"
+          title={tr('刷新目录', '重新整理目錄', 'Refresh')}
           className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-slate-700 transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
@@ -587,7 +652,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
             ) : (
               <Upload className="w-3.5 h-3.5" />
             )}
-            <span>上传</span>
+            <span>{tr('上传', '上傳', 'Upload')}</span>
           </button>
 
           {/* New Folder */}
@@ -599,7 +664,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
           >
             <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
-            <span>新建文件夹</span>
+            <span>{tr('新建文件夹', '新增資料夾', 'New Folder')}</span>
           </button>
 
           {/* Batch Delete */}
@@ -609,7 +674,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-medium transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>删除 ({selectedEntries.length})</span>
+              <span>
+                {tr('删除', '刪除', 'Delete')} ({selectedEntries.length})
+              </span>
             </button>
           )}
 
@@ -619,30 +686,34 @@ export const FilePane: React.FC<FilePaneProps> = ({
               <button
                 onClick={() => handleCommanderTransfer('copy')}
                 disabled={selectedEntries.length === 0}
-                title={`将选中项复制到对侧面板 (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
+                title={`${tr('复制到对侧面板', '複製到對側面板', 'Copy to opposite pane')} (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-white text-xs font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
                 <Copy className="w-3.5 h-3.5" />
-                <span>复制到{paneSide === 'left' ? '右侧 →' : '← 左侧'}</span>
+                <span>
+                  {paneSide === 'left'
+                    ? tr('复制到右侧 →', '複製到右側 →', 'Copy Right →')
+                    : tr('← 复制到左侧', '← 複製到左側', '← Copy Left')}
+                </span>
               </button>
 
               <button
                 onClick={() => handleCommanderTransfer('move')}
                 disabled={selectedEntries.length === 0}
-                title={`将选中项移动到对侧面板 (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
+                title={`${tr('移动到对侧面板', '移動到對側面板', 'Move to opposite pane')} (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-white text-xs font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
                 <MoveRight className="w-3.5 h-3.5" />
-                <span>移动</span>
+                <span>{tr('移动', '移動', 'Move')}</span>
               </button>
 
               <button
                 onClick={() => handleCommanderTransfer('sync', false)}
-                title={`将当前目录完整同步到对侧目录 (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
+                title={`${tr('将当前目录完整同步到对侧目录', '將目前目錄完整同步到對側目錄', 'Sync current folder to opposite pane')} (${oppositeTarget.remote}:${oppositeTarget.path || '/'})`}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-medium transition-colors"
               >
                 <ArrowLeftRight className="w-3.5 h-3.5" />
-                <span>同步目录</span>
+                <span>{tr('同步目录', '同步目錄', 'Sync Dir')}</span>
               </button>
             </div>
           )}
@@ -655,7 +726,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="过滤当前目录..."
+            placeholder={tr('过滤当前目录...', '過濾目前目錄...', 'Filter directory...')}
             className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500/70 rounded-lg pl-8 pr-6 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none"
           />
           {searchQuery && (
@@ -683,7 +754,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
             onClick={() => toggleSort('Name')}
             className="flex items-center gap-1 hover:text-slate-200"
           >
-            <span>名称 ({filteredAndSortedEntries.length})</span>
+            <span>
+              {tr('名称', '名稱', 'Name')} ({filteredAndSortedEntries.length})
+            </span>
             {sortBy === 'Name' &&
               (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
           </button>
@@ -694,7 +767,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
             onClick={() => toggleSort('Size')}
             className="inline-flex items-center gap-1 hover:text-slate-200"
           >
-            <span>大小</span>
+            <span>{tr('大小', '大小', 'Size')}</span>
             {sortBy === 'Size' &&
               (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
           </button>
@@ -705,13 +778,15 @@ export const FilePane: React.FC<FilePaneProps> = ({
             onClick={() => toggleSort('ModTime')}
             className="inline-flex items-center gap-1 hover:text-slate-200"
           >
-            <span>修改时间</span>
+            <span>{tr('修改时间', '修改時間', 'Modified')}</span>
             {sortBy === 'ModTime' &&
               (sortAsc ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}
           </button>
         </div>
 
-        <div className="col-span-4 sm:col-span-2 text-right pr-1">操作</div>
+        <div className="col-span-4 sm:col-span-2 text-right pr-1">
+          {tr('操作', '操作', 'Actions')}
+        </div>
       </div>
 
       {/* File List Body */}
@@ -719,7 +794,13 @@ export const FilePane: React.FC<FilePaneProps> = ({
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-sky-400" />
-            <span className="text-xs">正在通过 Rclone 读取目录列表...</span>
+            <span className="text-xs">
+              {tr(
+                '正在通过 Rclone 读取目录列表...',
+                '正在透過 Rclone 讀取目錄清單...',
+                'Reading directory via Rclone...'
+              )}
+            </span>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-64 p-6 text-center gap-3">
@@ -730,13 +811,19 @@ export const FilePane: React.FC<FilePaneProps> = ({
               onClick={loadDirectory}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200"
             >
-              重试
+              {tr('重试', '重試', 'Retry')}
             </button>
           </div>
         ) : filteredAndSortedEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-500 gap-2">
             <Folder className="w-8 h-8 stroke-1 text-slate-600" />
-            <p className="text-xs">当前目录为空（可将本地文件直接拖拽至此上传）</p>
+            <p className="text-xs">
+              {tr(
+                '当前目录为空（可将本地文件直接拖拽至此上传）',
+                '目前目錄為空（可將本機檔案直接拖曳至此上傳）',
+                'Directory is empty (Drag & drop files here to upload)'
+              )}
+            </p>
           </div>
         ) : (
           filteredAndSortedEntries.map((entry) => {
@@ -820,7 +907,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
                     <button
                       onClick={() => handleCalculateSize(entry)}
                       disabled={calculatingPath === entry.Path}
-                      title="统计文件夹大小 (rclone size)"
+                      title={tr('统计文件夹大小 (rclone size)', '統計資料夾大小 (rclone size)', 'Calculate folder size')}
                       className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-sky-400"
                     >
                       {calculatingPath === entry.Path ? (
@@ -833,7 +920,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
                     <>
                       <button
                         onClick={() => onPreviewFile(activeTab.remote, entry)}
-                        title="在线预览"
+                        title={tr('在线预览', '線上預覽', 'Preview')}
                         className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-sky-400"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -841,7 +928,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
                       <a
                         href={api.getDownloadUrl(activeTab.remote, entry.Path, false)}
                         download={entry.Name}
-                        title="下载文件"
+                        title={tr('下载文件', '下載檔案', 'Download')}
                         className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-emerald-400"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -854,7 +941,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
                       setRenameTarget(entry);
                       setRenameValue(entry.Name);
                     }}
-                    title="重命名"
+                    title={tr('重命名', '重新命名', 'Rename')}
                     className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-amber-400"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
@@ -862,7 +949,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
                   <button
                     onClick={() => handleDeleteItems([entry])}
-                    title="删除"
+                    title={tr('删除', '刪除', 'Delete')}
                     className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-rose-400"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -877,11 +964,14 @@ export const FilePane: React.FC<FilePaneProps> = ({
       {/* Pane Footer Summary */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-slate-950/80 border-t border-slate-800/80 text-[11px] text-slate-400">
         <div>
-          共 {entries.filter((e) => e.IsDir).length} 个文件夹，
-          {entries.filter((e) => !e.IsDir).length} 个文件
+          {tr(
+            `共 ${entries.filter((e) => e.IsDir).length} 个文件夹，${entries.filter((e) => !e.IsDir).length} 个文件`,
+            `共 ${entries.filter((e) => e.IsDir).length} 個資料夾，${entries.filter((e) => !e.IsDir).length} 個檔案`,
+            `${entries.filter((e) => e.IsDir).length} folders, ${entries.filter((e) => !e.IsDir).length} files`
+          )}
           {selectedEntries.length > 0 && (
             <span className="ml-2 text-sky-400 font-medium">
-              • 已选中 {selectedEntries.length} 项 (
+              • {tr('已选中', '已選取', 'Selected')} {selectedEntries.length} (
               {formatBytes(
                 selectedEntries.reduce((acc, item) => acc + (item.IsDir ? 0 : item.Size), 0)
               )}
@@ -901,14 +991,16 @@ export const FilePane: React.FC<FilePaneProps> = ({
             onSubmit={handleCreateFolder}
             className="bg-slate-900 border border-slate-700 rounded-xl p-5 w-full max-w-sm shadow-2xl space-y-4"
           >
-            <h4 className="text-sm font-semibold text-slate-100">新建文件夹</h4>
+            <h4 className="text-sm font-semibold text-slate-100">
+              {tr('新建文件夹', '新增資料夾', 'New Folder')}
+            </h4>
             <input
               type="text"
               autoFocus
               required
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="输入文件夹名称..."
+              placeholder={tr('输入文件夹名称...', '輸入資料夾名稱...', 'Enter folder name...')}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
             />
             <div className="flex justify-end gap-2">
@@ -917,13 +1009,13 @@ export const FilePane: React.FC<FilePaneProps> = ({
                 onClick={() => setNewFolderModal(false)}
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
               >
-                取消
+                {tr('取消', '取消', 'Cancel')}
               </button>
               <button
                 type="submit"
                 className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white"
               >
-                创建
+                {tr('创建', '建立', 'Create')}
               </button>
             </div>
           </form>
@@ -937,7 +1029,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
             onSubmit={handleRenameSubmit}
             className="bg-slate-900 border border-slate-700 rounded-xl p-5 w-full max-w-sm shadow-2xl space-y-4"
           >
-            <h4 className="text-sm font-semibold text-slate-100">重命名项目</h4>
+            <h4 className="text-sm font-semibold text-slate-100">
+              {tr('重命名项目', '重新命名項目', 'Rename Item')}
+            </h4>
             <input
               type="text"
               autoFocus
@@ -952,13 +1046,13 @@ export const FilePane: React.FC<FilePaneProps> = ({
                 onClick={() => setRenameTarget(null)}
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
               >
-                取消
+                {tr('取消', '取消', 'Cancel')}
               </button>
               <button
                 type="submit"
                 className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white"
               >
-                保存
+                {tr('保存', '儲存', 'Save')}
               </button>
             </div>
           </form>

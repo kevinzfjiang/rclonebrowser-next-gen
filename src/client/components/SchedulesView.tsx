@@ -19,6 +19,7 @@ import {
   TransferOperation,
 } from '../../shared/types';
 import { api } from '../api';
+import { useI18n } from '../i18n';
 import { formatDateTime } from '../utils/format';
 
 interface SchedulesViewProps {
@@ -30,16 +31,6 @@ interface SchedulesViewProps {
   onNotify: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-const CRON_PRESETS = [
-  { label: '每 15 分钟 (*/15 * * * *)', value: '*/15 * * * *' },
-  { label: '每 30 分钟 (*/30 * * * *)', value: '*/30 * * * *' },
-  { label: '每小时整点 (0 * * * *)', value: '0 * * * *' },
-  { label: '每 6 小时 (0 */6 * * *)', value: '0 */6 * * *' },
-  { label: '每天凌晨 02:00 (0 2 * * *)', value: '0 2 * * *' },
-  { label: '每天中午 12:00 (0 12 * * *)', value: '0 12 * * *' },
-  { label: '每周日凌晨 03:00 (0 3 * * 0)', value: '0 3 * * 0' },
-];
-
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
   schedules,
   remotes,
@@ -48,6 +39,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   onSwitchToTasks,
   onNotify,
 }) => {
+  const { tr } = useI18n();
   const [showModal, setShowModal] = useState(false);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
 
@@ -63,9 +55,40 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [saving, setSaving] = useState(false);
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
 
+  const cronPresets = [
+    {
+      label: tr('每 15 分钟 (*/15 * * * *)', '每 15 分鐘 (*/15 * * * *)', 'Every 15 mins (*/15 * * * *)'),
+      value: '*/15 * * * *',
+    },
+    {
+      label: tr('每 30 分钟 (*/30 * * * *)', '每 30 分鐘 (*/30 * * * *)', 'Every 30 mins (*/30 * * * *)'),
+      value: '*/30 * * * *',
+    },
+    {
+      label: tr('每小时整点 (0 * * * *)', '每小時整點 (0 * * * *)', 'Hourly (0 * * * *)'),
+      value: '0 * * * *',
+    },
+    {
+      label: tr('每 6 小时 (0 */6 * * *)', '每 6 小時 (0 */6 * * *)', 'Every 6 hours (0 */6 * * *)'),
+      value: '0 */6 * * *',
+    },
+    {
+      label: tr('每天凌晨 02:00 (0 2 * * *)', '每天凌晨 02:00 (0 2 * * *)', 'Daily at 02:00 (0 2 * * *)'),
+      value: '0 2 * * *',
+    },
+    {
+      label: tr('每天中午 12:00 (0 12 * * *)', '每天中午 12:00 (0 12 * * *)', 'Daily at 12:00 (0 12 * * *)'),
+      value: '0 12 * * *',
+    },
+    {
+      label: tr('每周日凌晨 03:00 (0 3 * * 0)', '每週日凌晨 03:00 (0 3 * * 0)', 'Weekly Sun 03:00 (0 3 * * 0)'),
+      value: '0 3 * * 0',
+    },
+  ];
+
   const openCreateModal = () => {
     setEditingJobId(null);
-    setName('每日自动云备份');
+    setName(tr('每日自动云备份', '每日自動雲端備份', 'Daily Cloud Backup'));
     setCronExpression('0 2 * * *');
     setOperation('copy');
     setSrcRemote('@media');
@@ -111,16 +134,19 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 
       if (editingJobId) {
         await api.updateSchedule(editingJobId, payload);
-        onNotify('已更新定时同步任务', 'success');
+        onNotify(tr('已更新定时同步任务', '已更新排程同步任務', 'Updated schedule'), 'success');
       } else {
         await api.createSchedule(payload);
-        onNotify('已创建定时同步任务', 'success');
+        onNotify(tr('已创建定时同步任务', '已建立排程同步任務', 'Created schedule'), 'success');
       }
 
       setShowModal(false);
       onRefreshSchedules();
     } catch (err: any) {
-      onNotify(err.message || '保存定时任务失败', 'error');
+      onNotify(
+        err.message || tr('保存定时任务失败', '儲存排程任務失敗', 'Failed to save schedule'),
+        'error'
+      );
     } finally {
       setSaving(false);
     }
@@ -130,12 +156,16 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     try {
       await api.updateSchedule(job.id, { enabled: !job.enabled });
       onNotify(
-        `定时任务 "${job.name}" 已${!job.enabled ? '启用' : '暂停'}`,
+        tr(
+          `定时任务 "${job.name}" 已${!job.enabled ? '启用' : '暂停'}`,
+          `排程任務 "${job.name}" 已${!job.enabled ? '啟用' : '暫停'}`,
+          `Schedule "${job.name}" ${!job.enabled ? 'enabled' : 'paused'}`
+        ),
         !job.enabled ? 'success' : 'info'
       );
       onRefreshSchedules();
     } catch (err: any) {
-      onNotify(err.message || '切换状态失败', 'error');
+      onNotify(err.message || tr('切换状态失败', '切換狀態失敗', 'Failed to toggle'), 'error');
     }
   };
 
@@ -143,24 +173,40 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setTriggeringId(job.id);
     try {
       await api.triggerSchedule(job.id);
-      onNotify(`已立即触发 "${job.name}"，可在任务中心查看实时进度`, 'success');
+      onNotify(
+        tr(
+          `已立即触发 "${job.name}"，可在任务中心查看实时进度`,
+          `已立即觸發 "${job.name}"，可在任務中心查看即時進度`,
+          `Triggered "${job.name}". View progress in Transfer Center.`
+        ),
+        'success'
+      );
       onRefreshSchedules();
       onRefreshTasks();
     } catch (err: any) {
-      onNotify(err.message || '触发失败', 'error');
+      onNotify(err.message || tr('触发失败', '觸發失敗', 'Failed to trigger'), 'error');
     } finally {
       setTriggeringId(null);
     }
   };
 
   const handleDelete = async (job: ScheduleJob) => {
-    if (!window.confirm(`确定要删除定时任务 "${job.name}" 吗？`)) return;
+    if (
+      !window.confirm(
+        tr(
+          `确定要删除定时任务 "${job.name}" 吗？`,
+          `確定要刪除排程任務 "${job.name}" 嗎？`,
+          `Are you sure you want to delete schedule "${job.name}"?`
+        )
+      )
+    )
+      return;
     try {
       await api.deleteSchedule(job.id);
-      onNotify('已删除定时任务', 'info');
+      onNotify(tr('已删除定时任务', '已刪除排程任務', 'Schedule deleted'), 'info');
       onRefreshSchedules();
     } catch (err: any) {
-      onNotify(err.message || '删除失败', 'error');
+      onNotify(err.message || tr('删除失败', '刪除失敗', 'Delete failed'), 'error');
     }
   };
 
@@ -171,10 +217,20 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
         <div>
           <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
             <CalendarClock className="w-4 h-4 text-sky-400" />
-            <span>Cron 定时同步与备份任务 ({schedules.length})</span>
+            <span>
+              {tr(
+                `Cron 定时同步与备份任务 (${schedules.length})`,
+                `Cron 排程同步與備份任務 (${schedules.length})`,
+                `Cron Scheduled Sync & Backup Jobs (${schedules.length})`
+              )}
+            </span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            支持标准 5 段式 Cron 表达式，容器后台自动按计划调用 Rclone 执行增量备份或镜像同步
+            {tr(
+              '支持标准 5 段式 Cron 表达式，容器后台自动按计划调用 Rclone 执行增量备份或镜像同步',
+              '支援標準 5 段式 Cron 表達式，容器背景自動依計畫呼叫 Rclone 執行增量備份或鏡像同步',
+              'Supports standard 5-field Cron expressions for automated background Rclone backups and syncs'
+            )}
           </p>
         </div>
 
@@ -183,7 +239,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-lg shadow-sky-600/20"
         >
           <Plus className="w-4 h-4" />
-          <span>新建定时任务</span>
+          <span>{tr('新建定时任务', '新增排程任務', 'New Schedule')}</span>
         </button>
       </div>
 
@@ -193,9 +249,19 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           <div className="flex flex-col items-center justify-center h-64 bg-slate-900/40 border border-slate-800/60 rounded-xl text-slate-500 gap-3">
             <CalendarClock className="w-10 h-10 stroke-1 text-slate-600" />
             <div className="text-center space-y-1">
-              <p className="text-xs text-slate-300">尚未配置任何定时备份或同步计划</p>
+              <p className="text-xs text-slate-300">
+                {tr(
+                  '尚未配置任何定时备份或同步计划',
+                  '尚未設定任何排程備份或同步計畫',
+                  'No scheduled backup or sync jobs configured yet'
+                )}
+              </p>
               <p className="text-[11px] text-slate-500">
-                点击右上角“新建定时任务”设置全自动云端同步
+                {tr(
+                  '点击右上角“新建定时任务”设置全自动云端同步',
+                  '點擊右上角「新增排程任務」設定全自動雲端同步',
+                  'Click "New Schedule" in the top right to automate cloud syncs'
+                )}
               </p>
             </div>
           </div>
@@ -211,7 +277,11 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <button
                     onClick={() => handleToggleEnable(job)}
-                    title={job.enabled ? '点击暂停计划' : '点击启用计划'}
+                    title={
+                      job.enabled
+                        ? tr('点击暂停计划', '點擊暫停計畫', 'Click to disable')
+                        : tr('点击启用计划', '點擊啟用計畫', 'Click to enable')
+                    }
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
                       job.enabled
                         ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
@@ -219,7 +289,11 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     }`}
                   >
                     <Power className="w-3 h-3" />
-                    <span>{job.enabled ? '已启用' : '已暂停'}</span>
+                    <span>
+                      {job.enabled
+                        ? tr('已启用', '已啟用', 'Enabled')
+                        : tr('已暂停', '已暫停', 'Disabled')}
+                    </span>
                   </button>
 
                   <span className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-bold uppercase">
@@ -244,13 +318,13 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     ) : (
                       <Play className="w-3.5 h-3.5" />
                     )}
-                    <span>立即运行一次</span>
+                    <span>{tr('立即运行一次', '立即執行一次', 'Run Now')}</span>
                   </button>
 
                   <button
                     onClick={() => openEditModal(job)}
                     className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300"
-                    title="编辑计划"
+                    title={tr('编辑计划', '編輯計畫', 'Edit Schedule')}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
@@ -258,7 +332,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   <button
                     onClick={() => handleDelete(job)}
                     className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400"
-                    title="删除计划"
+                    title={tr('删除计划', '刪除計畫', 'Delete Schedule')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -279,28 +353,31 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-sky-400" />
-                    下次计划运行:{' '}
+                    {tr('下次计划运行:', '下次排程執行:', 'Next Run:')}{' '}
                     <strong className="text-slate-200">
-                      {job.enabled && job.nextRunAt ? formatDateTime(job.nextRunAt) : '已暂停'}
+                      {job.enabled && job.nextRunAt
+                        ? formatDateTime(job.nextRunAt)
+                        : tr('已暂停', '已暫停', 'Disabled')}
                     </strong>
                   </span>
 
                   {job.lastRunAt && (
                     <span className="flex items-center gap-1.5">
-                      上次运行: {formatDateTime(job.lastRunAt)}
+                      {tr('上次运行:', '上次執行:', 'Last Run:')} {formatDateTime(job.lastRunAt)}
                       {job.lastRunStatus === 'completed' && (
                         <span className="inline-flex items-center gap-0.5 text-emerald-400">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> 成功
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {tr('成功', '成功', 'Success')}
                         </span>
                       )}
                       {job.lastRunStatus === 'failed' && (
                         <span className="inline-flex items-center gap-0.5 text-rose-400">
-                          <XCircle className="w-3.5 h-3.5" /> 失败
+                          <XCircle className="w-3.5 h-3.5" /> {tr('失败', '失敗', 'Failed')}
                         </span>
                       )}
                       {job.lastRunStatus === 'running' && (
                         <span className="inline-flex items-center gap-0.5 text-sky-400">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> 执行中
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />{' '}
+                          {tr('执行中', '執行中', 'Running')}
                         </span>
                       )}
                     </span>
@@ -312,7 +389,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     onClick={onSwitchToTasks}
                     className="text-sky-400 hover:underline text-xs"
                   >
-                    查看任务日志 →
+                    {tr('查看任务日志 →', '查看任務日誌 →', 'View Task Logs →')}
                   </button>
                 )}
               </div>
@@ -330,7 +407,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
           >
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-100">
-                {editingJobId ? '编辑定时同步计划' : '新建 Cron 定时同步计划'}
+                {editingJobId
+                  ? tr('编辑定时同步计划', '編輯排程同步計畫', 'Edit Cron Schedule')
+                  : tr('新建 Cron 定时同步计划', '新增 Cron 排程同步計畫', 'New Cron Schedule')}
               </h3>
               <button
                 type="button"
@@ -344,27 +423,31 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
             <div className="p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">计划任务名称 *</label>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    {tr('计划任务名称 *', '排程任務名稱 *', 'Schedule Name *')}
+                  </label>
                   <input
                     type="text"
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="如: 每日照片库异地备份"
+                    placeholder={tr('如: 每日照片库异地备份', '如: 每日照片庫異地備份', 'e.g. Nightly Photos Backup')}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">同步动作类型 *</label>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    {tr('同步动作类型 *', '同步動作類型 *', 'Operation *')}
+                  </label>
                   <select
                     value={operation}
                     onChange={(e) => setOperation(e.target.value as TransferOperation)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
                   >
-                    <option value="copy">COPY (增量复制备份)</option>
-                    <option value="sync">SYNC (镜像同步)</option>
-                    <option value="move">MOVE (定时归档移动)</option>
+                    <option value="copy">{tr('COPY (增量复制备份)', 'COPY (增量複製備份)', 'COPY (Incremental Backup)')}</option>
+                    <option value="sync">{tr('SYNC (镜像同步)', 'SYNC (鏡像同步)', 'SYNC (Mirror Sync)')}</option>
+                    <option value="move">{tr('MOVE (定时归档移动)', 'MOVE (定時歸檔移動)', 'MOVE (Archive & Move)')}</option>
                   </select>
                 </div>
               </div>
@@ -372,18 +455,26 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               {/* Cron Expression */}
               <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="font-semibold text-amber-400">Cron 周期表达式 (分 时 日 月 周)</label>
+                  <label className="font-semibold text-amber-400">
+                    {tr(
+                      'Cron 周期表达式 (分 时 日 月 周)',
+                      'Cron 週期表達式 (分 時 日 月 週)',
+                      'Cron Expression (min hour day month weekday)'
+                    )}
+                  </label>
                   <select
                     value={
-                      CRON_PRESETS.some((p) => p.value === cronExpression) ? cronExpression : ''
+                      cronPresets.some((p) => p.value === cronExpression) ? cronExpression : ''
                     }
                     onChange={(e) => {
                       if (e.target.value) setCronExpression(e.target.value);
                     }}
                     className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-200"
                   >
-                    <option value="">-- 选择常用周期预设 --</option>
-                    {CRON_PRESETS.map((p) => (
+                    <option value="">
+                      {tr('-- 选择常用周期预设 --', '-- 選擇常用週期預設 --', '-- Select Preset --')}
+                    </option>
+                    {cronPresets.map((p) => (
                       <option key={p.value} value={p.value}>
                         {p.label}
                       </option>
@@ -404,7 +495,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               {/* Source */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-slate-400 mb-1">源 Remote</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('源 Remote', '來源 Remote', 'Source Remote')}
+                  </label>
                   <select
                     value={srcRemote}
                     onChange={(e) => setSrcRemote(e.target.value)}
@@ -412,13 +505,17 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   >
                     {remotes.map((r) => (
                       <option key={r.name} value={r.name}>
-                        {r.name === '@media' ? '本地 (/media)' : `${r.name}: (${r.type})`}
+                        {r.name === '@media'
+                          ? tr('本地 (/media)', '本機 (/media)', 'Local (/media)')
+                          : `${r.name}: (${r.type})`}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-slate-400 mb-1">源目录路径</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('源目录路径', '來源目錄路徑', 'Source Path')}
+                  </label>
                   <input
                     type="text"
                     value={srcPath}
@@ -432,7 +529,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               {/* Destination */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-slate-400 mb-1">目标 Remote</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('目标 Remote', '目標 Remote', 'Destination Remote')}
+                  </label>
                   <select
                     value={dstRemote}
                     onChange={(e) => setDstRemote(e.target.value)}
@@ -440,13 +539,17 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   >
                     {remotes.map((r) => (
                       <option key={r.name} value={r.name}>
-                        {r.name === '@media' ? '本地 (/media)' : `${r.name}: (${r.type})`}
+                        {r.name === '@media'
+                          ? tr('本地 (/media)', '本機 (/media)', 'Local (/media)')
+                          : `${r.name}: (${r.type})`}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-slate-400 mb-1">目标目录路径</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('目标目录路径', '目標目錄路徑', 'Destination Path')}
+                  </label>
                   <input
                     type="text"
                     value={dstPath}
@@ -460,17 +563,21 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               {/* Extra options */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">任务限速 (--bwlimit，可选)</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('任务限速 (--bwlimit，可选)', '任務限速 (--bwlimit，選填)', 'Bandwidth Limit (--bwlimit)')}
+                  </label>
                   <input
                     type="text"
                     value={bwlimit}
                     onChange={(e) => setBwlimit(e.target.value)}
-                    placeholder="例如: 10M"
+                    placeholder="10M"
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">排除文件规则 (--exclude，可选)</label>
+                  <label className="block text-slate-400 mb-1">
+                    {tr('排除文件规则 (--exclude，可选)', '排除檔案規則 (--exclude，選填)', 'Exclude Pattern (--exclude)')}
+                  </label>
                   <input
                     type="text"
                     value={exclude}
@@ -488,7 +595,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
               >
-                取消
+                {tr('取消', '取消', 'Cancel')}
               </button>
               <button
                 type="submit"
@@ -496,7 +603,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white disabled:opacity-50"
               >
                 {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>保存定时任务</span>
+                <span>{tr('保存定时任务', '儲存排程任務', 'Save Schedule')}</span>
               </button>
             </div>
           </form>

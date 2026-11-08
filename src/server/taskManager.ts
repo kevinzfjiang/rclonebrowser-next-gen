@@ -142,8 +142,13 @@ class TaskManager {
   }
 
   public getActiveStats(): { activeTasksCount: number; totalSpeed: number } {
-    const running = this.tasks.filter((t) => t.status === 'running' || t.status === 'queued');
-    const totalSpeed = running.reduce((acc, t) => acc + (t.speed || 0), 0);
+    const running = this.tasks.filter(
+      (t) => t.status === 'running' || t.status === 'queued' || t.status === 'paused'
+    );
+    const totalSpeed = running.reduce(
+      (acc, t) => acc + (t.status === 'running' ? t.speed || 0 : 0),
+      0
+    );
     return {
       activeTasksCount: running.length,
       totalSpeed,
@@ -217,26 +222,109 @@ class TaskManager {
     }
   }
 
+  public pauseTask(id: string): TransferTask {
+    const task = this.tasks.find((t) => t.id === id);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+    if (task.status === 'queued') {
+      task.status = 'paused';
+      task.speed = 0;
+      task.eta = null;
+      this.appendLog(task, `[PAUSED] Task paused in queue (${new Date().toLocaleTimeString()})`);
+      this.saveState();
+      return task;
+    }
+    if (task.status !== 'running') {
+      throw new Error('Only running or queued tasks can be paused');
+    }
+
+    task.status = 'paused';
+    task.speed = 0;
+    task.eta = null;
+    this.appendLog(task, `[PAUSED] Task execution paused (${new Date().toLocaleTimeString()})`);
+
+    const procs = this.activeProcesses.get(id);
+    if (procs && procs.length > 0) {
+      if (process.platform !== 'win32') {
+        for (const p of procs) {
+          try {
+            p.kill('SIGSTOP');
+          } catch {
+            // Fallback if SIGSTOP fails
+          }
+        }
+      } else {
+        // On Windows where POSIX SIGSTOP is unavailable, stop the process and resume via idempotent rclone restart
+        this.killTaskProcesses(id);
+      }
+    }
+    this.saveState();
+    return task;
+  }
+
+  public resumeTask(id: string): TransferTask {
+    const task = this.tasks.find((t) => t.id === id);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+    if (task.status !== 'paused') {
+      throw new Error('Only paused tasks can be resumed');
+    }
+
+    const procs = this.activeProcesses.get(id);
+    if (procs && procs.length > 0 && process.platform !== 'win32') {
+      for (const p of procs) {
+        try {
+          p.kill('SIGCONT');
+        } catch {
+          // Ignore
+        }
+      }
+      task.status = 'running';
+      this.appendLog(task, `[RESUMED] Task execution resumed (${new Date().toLocaleTimeString()})`);
+      this.saveState();
+      return task;
+    }
+
+    // Re-queue to resume transfer from where it left off
+    task.status = 'queued';
+    this.appendLog(task, `[RESUMED] Task resumed and queued (${new Date().toLocaleTimeString()})`);
+    this.saveState();
+    this.processQueue();
+    return task;
+  }
+
   public cancelTask(id: string): TransferTask {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) {
-      throw new Error('找不到对应的任务');
+      throw new Error('Task not found');
     }
-    if (task.status === 'queued') {
+    if (task.status === 'queued' || (task.status === 'paused' && !this.activeProcesses.has(id))) {
       task.status = 'cancelled';
       task.completedAt = new Date().toISOString();
-      task.logs.push(`[${new Date().toLocaleTimeString()}] 用户在队列阶段取消了任务`);
+      task.logs.push(`[${new Date().toLocaleTimeString()}] Task cancelled by user`);
       this.saveState();
       return task;
     }
 
     if (this.activeProcesses.has(id)) {
+      const procs = this.activeProcesses.get(id);
+      if (procs && process.platform !== 'win32') {
+        for (const p of procs) {
+          try {
+            p.kill('SIGCONT');
+          } catch {
+            // Ensure stopped processes receive SIGTERM
+          }
+        }
+      }
       task.status = 'cancelled';
       task.speed = 0;
       task.eta = null;
       task.activeFiles = [];
       task.completedAt = new Date().toISOString();
-      task.logs.push(`[${new Date().toLocaleTimeString()}] 正在终止 Rclone 进程...`);
+      task.logs.push(`[${new Date().toLocaleTimeString()}] Terminating Rclone process...`);
       this.killTaskProcesses(id);
       this.saveState();
       this.processQueue();
@@ -270,7 +358,9 @@ class TaskManager {
   }
 
   public clearCompletedTasks(): void {
-    this.tasks = this.tasks.filter((t) => t.status === 'running' || t.status === 'queued');
+    this.tasks = this.tasks.filter(
+      (t) => t.status === 'running' || t.status === 'queued' || t.status === 'paused'
+    );
     this.saveState();
   }
 
@@ -538,6 +628,13 @@ class TaskManager {
         handleLine(stderrBuffer);
       }
       this.killTaskProcesses(task.id);
+
+      if (task.status === 'paused') {
+        // Process was stopped on Windows to pause; keep status as 'paused'
+        this.saveState();
+        this.processQueue();
+        return;
+      }
 
       if (task.status === 'cancelled') {
         this.appendLog(task, `[CANCELLED] 任务已取消`);

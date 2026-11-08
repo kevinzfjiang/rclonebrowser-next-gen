@@ -6,14 +6,14 @@ services:
     ports:
       - "5800:5800"
     environment:
-      # 群晖 DSM 7 的 /volume1/docker 默认开启了 ACL 限制，推荐设为 0:0 (或给 docker 共享文件夹授予 1026 读写权限)
+      # On Synology DSM 7+, /volume1/docker often has ACL restrictions; 0:0 ensures full read/write access
       - PUID=0
       - PGID=0
       - TZ=Asia/Shanghai
       - PORT=5800
-      # 可选：将多个挂载点注册为独立下拉存储源（方便在文件管理器下拉框一键直达）
+      # Optional: Register multiple local mounts as standalone dropdown items in the Explorer
       - LOCAL_MOUNTS=NAS=/media/NAS,NAS2=/media/NAS2,Photos=/media/Photos
-      # 可选：设置 Web 登录用户名与密码（留空 APP_PASSWORD 则免密直接进入）
+      # Optional: Set Web UI login username and password (leave APP_PASSWORD empty for passwordless access)
       - APP_USERNAME=admin
       - APP_PASSWORD=
     volumes:
@@ -21,7 +21,7 @@ services:
       - /volume3/NAS:/media/NAS
       - /volume1/NAS2:/media/NAS2
       - /volume2/homes/kevin/Photos:/media/Photos
-    # 如需在容器内使用 rclone mount 挂载，可取消以下注释：
+    # Uncomment the lines below if you need `rclone mount` inside the container:
     # cap_add:
     #   - SYS_ADMIN
     # devices:
