@@ -67,9 +67,10 @@ services:
     ports:
       - "5800:5800"
     environment:
-      # 群晖默认首个管理员 UID=1026, GID=100 (可通过 SSH 执行 `id 用户名` 确认)
-      - PUID=1026
-      - PGID=100
+      # 群晖 DSM 7 的 /volume1/docker 默认有 ACL 权限限制，设为 0:0 可直接读写所有挂载卷
+      # (若想使用 PUID=1026，需在群晖“控制面板 -> 共享文件夹 -> docker -> 编辑 -> 权限”中勾选该用户的可读写权限)
+      - PUID=0
+      - PGID=0
       - TZ=Asia/Shanghai
       - PORT=5800
       # 将多个本地挂载点注册为独立下拉存储源（在文件管理器下拉菜单一键直达）

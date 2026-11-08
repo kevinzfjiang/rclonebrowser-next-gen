@@ -6,9 +6,9 @@ services:
     ports:
       - "5800:5800"
     environment:
-      # 群晖建议通过 ssh 执行 `id <用户名>` 查看实际 UID/GID (通常管理员为 1026:100，普通 Linux 为 1000:1000)
-      - PUID=1026
-      - PGID=100
+      # 群晖 DSM 7 的 /volume1/docker 默认开启了 ACL 限制，推荐设为 0:0 (或给 docker 共享文件夹授予 1026 读写权限)
+      - PUID=0
+      - PGID=0
       - TZ=Asia/Shanghai
       - PORT=5800
       # 可选：将多个挂载点注册为独立下拉存储源（方便在文件管理器下拉框一键直达）

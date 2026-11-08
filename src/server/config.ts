@@ -70,22 +70,31 @@ export function getExtraLocalMounts(): CustomLocalMount[] {
 }
 
 export function ensureDirectoriesAndDefaults(): void {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.mkdirSync(path.dirname(RCLONE_CONFIG_PATH), { recursive: true });
-  fs.mkdirSync(MEDIA_DIR, { recursive: true });
-  fs.mkdirSync(UPLOAD_TEMP_DIR, { recursive: true });
+  for (const dir of [CONFIG_DIR, path.dirname(RCLONE_CONFIG_PATH), MEDIA_DIR, UPLOAD_TEMP_DIR]) {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (err: any) {
+      console.warn(`[Config] Warning creating directory ${dir}: ${err.message}`);
+    }
+  }
 
-  if (!fs.existsSync(RCLONE_CONFIG_PATH)) {
-    const initialConf = [
-      '# RcloneBrowser Next Gen Configuration File',
-      '# Managed automatically via Web UI or manual edits',
-      '',
-      '[local_media]',
-      'type = alias',
-      `remote = ${MEDIA_DIR.replace(/\\/g, '/')}`,
-      '',
-    ].join('\n');
-    fs.writeFileSync(RCLONE_CONFIG_PATH, initialConf, 'utf-8');
+  try {
+    if (!fs.existsSync(RCLONE_CONFIG_PATH)) {
+      const initialConf = [
+        '# RcloneBrowser Next Gen Configuration File',
+        '# Managed automatically via Web UI or manual edits',
+        '',
+        '[local_media]',
+        'type = alias',
+        `remote = ${MEDIA_DIR.replace(/\\/g, '/')}`,
+        '',
+      ].join('\n');
+      fs.writeFileSync(RCLONE_CONFIG_PATH, initialConf, 'utf-8');
+    }
+  } catch (err: any) {
+    console.warn(`[Config] Warning initializing ${RCLONE_CONFIG_PATH}: ${err.message}`);
   }
 
   // Create sample folders in MEDIA_DIR if completely empty so first-time users can test right away
