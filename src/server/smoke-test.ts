@@ -176,11 +176,19 @@ async function runSmokeTests() {
     }, 200);
   });
 
+  const logFileInfo = taskManager.getTaskLogFilePath(copyTask.id);
+  assert.ok(fs.existsSync(logFileInfo.filePath), 'Per-task .log file should exist in /config/logs');
+  const logFileContent = fs.readFileSync(logFileInfo.filePath, 'utf-8');
+  assert.ok(
+    logFileContent.includes('[CMD] rclone copy') && logFileContent.includes('[SUCCESS]'),
+    'Per-task .log file should contain full Rclone command and completion logs'
+  );
+
   const copiedFiles = await listDirectory('@media', 'Backups/SmokeCopy');
   assert.ok(copiedFiles.length > 0, 'Copied files should exist in Backups/SmokeCopy');
   await deleteEntry('@media', 'Backups/SmokeCopy', true);
   taskManager.deleteTask(copyTask.id);
-  console.log('✔ Real Rclone copy task execution & progress tracking verified.');
+  console.log('✔ Real Rclone copy task execution, progress tracking & /config/logs/*.log file verified.');
 
   // 5. Verify Cron Scheduler CRUD
   const schedule = schedulerService.createSchedule({

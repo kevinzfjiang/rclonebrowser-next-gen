@@ -36,9 +36,10 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
    - Drag-and-drop file upload, **inline browser preview** (Text, Code, Markdown, JSON, Images, Video, Audio), streaming download, mkdir, rename, batch delete, and folder size calculation (`rclone size`).
    - One-click **Copy →**, **Move →**, and **Sync Dir ⇄** between panes.
 
-2. **Transfer & Sync Task Center with Pause / Resume (`Transfers`)**
+2. **Transfer & Sync Task Center with Pause / Resume & Full `.log` Files (`Transfers`)**
    - Asynchronous task queue supporting `Copy`, `Sync`, `Move`, and `Check`.
    - Real-time progress bars, transfer speed (MB/s), ETA, active file sub-progress, and expandable **Rclone live terminal log console**.
+   - **Per-Task Full `.log` Files**: Every transfer task writes a complete, timestamped `.log` file to `/config/logs/<date>_<op>_<id>.log` (with automatic 100-file rotation and 50MB per-file cap) and provides one-click **View Raw `.log`** & **Download Full `.log`** buttons in the Web UI.
    - Full support for **Pause**, **Resume**, **Cancel**, **Retry**, and on-the-fly **Global Bandwidth Limit (`--bwlimit`)**.
 
 3. **Visual Remote Wizard & Per-Remote Proxy Isolation (`Remotes`)**

@@ -104,6 +104,7 @@ export interface TransferTask {
   completedAt?: string;
   error?: string;
   logs: string[];
+  logFileName?: string;
   triggeredBy: 'manual' | 'schedule';
   scheduleId?: string;
 }

@@ -239,6 +239,17 @@ export const api = {
       method: 'POST',
     }),
 
+  getTaskLogDownloadUrl: (id: string, inline = false) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams({
+      inline: inline ? '1' : '0',
+    });
+    if (token) {
+      params.set('token', token);
+    }
+    return `/api/tasks/${encodeURIComponent(id)}/log?${params.toString()}`;
+  },
+
   // Schedules
   getSchedules: () => requestJson<{ schedules: ScheduleJob[] }>('/api/schedules'),
 

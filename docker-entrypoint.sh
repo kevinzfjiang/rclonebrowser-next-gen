@@ -19,7 +19,7 @@ if [ -n "${TZ}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
 fi
 
 # Ensure directories exist
-mkdir -p "${CONFIG_DIR}/rclone" "${CONFIG_DIR}/tmp_uploads" "${MEDIA_DIR}" || true
+mkdir -p "${CONFIG_DIR}/rclone" "${CONFIG_DIR}/tmp_uploads" "${CONFIG_DIR}/logs" "${MEDIA_DIR}" || true
 
 # Migrate legacy rclone.conf from old jlesage/baseimage-gui container if present
 if [ ! -f "${RCLONE_CONFIG}" ]; then

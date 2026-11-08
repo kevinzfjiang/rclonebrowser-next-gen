@@ -2,7 +2,8 @@ import { ChildProcess, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
-import { RCLONE_CONFIG_PATH, SETTINGS_DB_PATH, TASKS_DB_PATH } from './config.js';
+import path from 'node:path';
+import { LOGS_DIR, RCLONE_CONFIG_PATH, SETTINGS_DB_PATH, TASKS_DB_PATH } from './config.js';
 import {
   buildRcloneProxyEnvAndArgs,
   getRemoteProxyUrl,
@@ -16,6 +17,18 @@ import {
 
 const MAX_LOG_LINES = 250;
 const MAX_STORED_TASKS = 100;
+const MAX_LOG_FILES = 100;
+const MAX_SINGLE_LOG_BYTES = 50 * 1024 * 1024; // 50 MB safety cap per log file
+
+function buildLogFileName(operation: string, id: string, date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const datePart = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(
+    date.getHours()
+  )}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  const cleanOp = operation.toLowerCase().replace(/[^a-z0-9]/g, '') || 'task';
+  const shortId = id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || 'log';
+  return `${datePart}_${cleanOp}_${shortId}.log`;
+}
 
 interface ServerSettings {
   globalBwLimit: string;
@@ -167,10 +180,12 @@ class TaskManager {
     scheduleId?: string;
   }): TransferTask {
     const id = crypto.randomUUID();
+    const now = new Date();
     const opUpper = params.operation.toUpperCase();
     const defaultName =
       params.name ||
       `${opUpper}: ${params.srcRemote}:${params.srcPath || '/'} → ${params.dstRemote}:${params.dstPath || '/'}`;
+    const logFileName = buildLogFileName(params.operation, id, now);
 
     const task: TransferTask = {
       id,
@@ -193,17 +208,22 @@ class TaskManager {
       errorsCount: 0,
       activeFiles: [],
       options: params.options || {},
-      createdAt: new Date().toISOString(),
-      logs: [`[${new Date().toLocaleTimeString()}] 任务已创建并加入执行队列 (${defaultName})`],
+      createdAt: now.toISOString(),
+      logs: [],
+      logFileName,
       triggeredBy: params.triggeredBy || 'manual',
       scheduleId: params.scheduleId,
     };
+
+    this.initTaskLogFile(task);
+    this.appendLog(task, `[${now.toLocaleTimeString()}] Task created and queued (${defaultName})`);
 
     this.tasks.unshift(task);
     if (this.tasks.length > MAX_STORED_TASKS) {
       this.tasks = this.tasks.slice(0, MAX_STORED_TASKS);
     }
     this.saveState();
+    this.cleanupOldLogFiles();
     this.processQueue();
     return task;
   }
@@ -303,7 +323,7 @@ class TaskManager {
     if (task.status === 'queued' || (task.status === 'paused' && !this.activeProcesses.has(id))) {
       task.status = 'cancelled';
       task.completedAt = new Date().toISOString();
-      task.logs.push(`[${new Date().toLocaleTimeString()}] Task cancelled by user`);
+      this.appendLog(task, `[${new Date().toLocaleTimeString()}] Task cancelled by user`);
       this.saveState();
       return task;
     }
@@ -324,7 +344,7 @@ class TaskManager {
       task.eta = null;
       task.activeFiles = [];
       task.completedAt = new Date().toISOString();
-      task.logs.push(`[${new Date().toLocaleTimeString()}] Terminating Rclone process...`);
+      this.appendLog(task, `[${new Date().toLocaleTimeString()}] Terminating Rclone process...`);
       this.killTaskProcesses(id);
       this.saveState();
       this.processQueue();
@@ -335,7 +355,7 @@ class TaskManager {
   public retryTask(id: string): TransferTask {
     const orig = this.tasks.find((t) => t.id === id);
     if (!orig) {
-      throw new Error('找不到对应的任务');
+      throw new Error('Task not found');
     }
     return this.createTask({
       name: orig.name,
@@ -353,6 +373,17 @@ class TaskManager {
     if (this.activeProcesses.has(id)) {
       this.cancelTask(id);
     }
+    const target = this.tasks.find((t) => t.id === id);
+    if (target?.logFileName) {
+      try {
+        const logPath = path.join(LOGS_DIR, path.basename(target.logFileName));
+        if (fs.existsSync(logPath)) {
+          fs.unlinkSync(logPath);
+        }
+      } catch {
+        // Ignore file deletion error
+      }
+    }
     this.tasks = this.tasks.filter((t) => t.id !== id);
     this.saveState();
   }
@@ -364,11 +395,111 @@ class TaskManager {
     this.saveState();
   }
 
+  private ensureTaskLogFileName(task: TransferTask): string {
+    if (!task.logFileName) {
+      task.logFileName = buildLogFileName(
+        task.operation,
+        task.id,
+        task.createdAt ? new Date(task.createdAt) : new Date()
+      );
+    }
+    return path.basename(task.logFileName);
+  }
+
+  private initTaskLogFile(task: TransferTask): void {
+    try {
+      if (!fs.existsSync(LOGS_DIR)) {
+        fs.mkdirSync(LOGS_DIR, { recursive: true });
+      }
+      const fileName = this.ensureTaskLogFileName(task);
+      const filePath = path.join(LOGS_DIR, fileName);
+      const header = [
+        '================================================================================',
+        'RcloneBrowser Next Gen - Transfer Task Log',
+        `Task ID      : ${task.id}`,
+        `Task Name    : ${task.name}`,
+        `Operation    : ${task.operation.toUpperCase()}`,
+        `Source       : ${task.srcRemote}:${task.srcPath || '/'}`,
+        `Destination  : ${task.dstRemote}:${task.dstPath || '/'}`,
+        `Created At   : ${task.createdAt}`,
+        '================================================================================',
+        '',
+      ].join('\n');
+      fs.writeFileSync(filePath, header, 'utf-8');
+    } catch {
+      // Ignore file init error
+    }
+  }
+
   private appendLog(task: TransferTask, line: string): void {
     task.logs.push(line);
     if (task.logs.length > MAX_LOG_LINES) {
       task.logs.splice(0, task.logs.length - MAX_LOG_LINES);
     }
+
+    try {
+      if (!fs.existsSync(LOGS_DIR)) {
+        fs.mkdirSync(LOGS_DIR, { recursive: true });
+      }
+      const fileName = this.ensureTaskLogFileName(task);
+      const filePath = path.join(LOGS_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        const stat = fs.statSync(filePath);
+        if (stat.size >= MAX_SINGLE_LOG_BYTES) {
+          return;
+        }
+      } else {
+        this.initTaskLogFile(task);
+      }
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync(filePath, `[${timestamp}] ${line}\n`, 'utf-8');
+    } catch {
+      // Ignore disk write errors
+    }
+  }
+
+  private cleanupOldLogFiles(): void {
+    try {
+      if (!fs.existsSync(LOGS_DIR)) return;
+      const entries = fs
+        .readdirSync(LOGS_DIR)
+        .filter((f) => f.endsWith('.log'))
+        .map((name) => {
+          const fullPath = path.join(LOGS_DIR, name);
+          const stat = fs.statSync(fullPath);
+          return { name, fullPath, mtimeMs: stat.mtimeMs };
+        })
+        .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+      if (entries.length > MAX_LOG_FILES) {
+        for (const oldEntry of entries.slice(MAX_LOG_FILES)) {
+          try {
+            fs.unlinkSync(oldEntry.fullPath);
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+
+  public getTaskLogFilePath(id: string): { filePath: string; fileName: string } {
+    const task = this.getTaskById(id);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+    const fileName = this.ensureTaskLogFileName(task);
+    const filePath = path.join(LOGS_DIR, fileName);
+    if (!fs.existsSync(filePath)) {
+      this.initTaskLogFile(task);
+      if (task.logs.length > 0) {
+        fs.appendFileSync(filePath, task.logs.join('\n') + '\n', 'utf-8');
+      }
+      this.saveState();
+    }
+    return { filePath, fileName };
   }
 
   private processQueue(): void {

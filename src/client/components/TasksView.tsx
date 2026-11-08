@@ -5,6 +5,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  Download,
+  ExternalLink,
   Gauge,
   Loader2,
   Pause,
@@ -423,6 +425,20 @@ export const TasksView: React.FC<TasksViewProps> = ({
                       </span>
                     </button>
 
+                    <a
+                      href={api.getTaskLogDownloadUrl(task.id, false)}
+                      download={task.logFileName || `task-${task.id}.log`}
+                      title={tr(
+                        `下载完整日志文件 (/config/logs/${task.logFileName || ''})`,
+                        `下載完整日誌檔案 (/config/logs/${task.logFileName || ''})`,
+                        `Download full log file (/config/logs/${task.logFileName || ''})`
+                      )}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-sky-300 border border-slate-800 text-xs transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>.log</span>
+                    </a>
+
                     {isRunningOrQueued ? (
                       <>
                         <button
@@ -569,31 +585,60 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
                 {/* Terminal Logs Drawer */}
                 {isLogsOpen && (
-                  <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 max-h-60 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1 select-text">
-                    {task.logs.length === 0 ? (
-                      <p className="text-slate-500">
-                        {tr('暂无日志输出...', '暫無日誌輸出...', 'No logs yet...')}
-                      </p>
-                    ) : (
-                      task.logs.map((line, idx) => (
-                        <div
-                          key={idx}
-                          className={
-                            line.includes('[ERROR]') || line.includes('[FAILED]')
-                              ? 'text-rose-400'
-                              : line.includes('[SUCCESS]') || line.includes('[RESUMED]')
-                                ? 'text-emerald-400'
-                                : line.includes('[PAUSED]')
-                                  ? 'text-amber-400'
-                                  : line.includes('[CMD]') || line.includes('[PROXY]')
-                                    ? 'text-sky-400'
-                                    : 'text-slate-300'
-                          }
+                  <div className="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-900/90 border-b border-slate-800 text-[11px] text-slate-400">
+                      <span className="font-mono truncate">
+                        {tr('日志文件', '日誌檔案', 'Log File')}:{' '}
+                        <span className="text-sky-300">
+                          /config/logs/{task.logFileName || `${task.id}.log`}
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <a
+                          href={api.getTaskLogDownloadUrl(task.id, true)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-slate-300 hover:text-sky-400"
                         >
-                          {line}
-                        </div>
-                      ))
-                    )}
+                          <ExternalLink className="w-3 h-3" />
+                          <span>{tr('新窗口查看完整日志', '新視窗檢視完整日誌', 'View Raw .log')}</span>
+                        </a>
+                        <a
+                          href={api.getTaskLogDownloadUrl(task.id, false)}
+                          download={task.logFileName || `task-${task.id}.log`}
+                          className="inline-flex items-center gap-1 text-sky-400 hover:underline font-medium"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>{tr('下载完整 .log', '下載完整 .log', 'Download Full .log')}</span>
+                        </a>
+                      </div>
+                    </div>
+                    <div className="p-3 max-h-60 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1 select-text">
+                      {task.logs.length === 0 ? (
+                        <p className="text-slate-500">
+                          {tr('暂无日志输出...', '暫無日誌輸出...', 'No logs yet...')}
+                        </p>
+                      ) : (
+                        task.logs.map((line, idx) => (
+                          <div
+                            key={idx}
+                            className={
+                              line.includes('[ERROR]') || line.includes('[FAILED]')
+                                ? 'text-rose-400'
+                                : line.includes('[SUCCESS]') || line.includes('[RESUMED]')
+                                  ? 'text-emerald-400'
+                                  : line.includes('[PAUSED]')
+                                    ? 'text-amber-400'
+                                    : line.includes('[CMD]') || line.includes('[PROXY]')
+                                      ? 'text-sky-400'
+                                      : 'text-slate-300'
+                            }
+                          >
+                            {line}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

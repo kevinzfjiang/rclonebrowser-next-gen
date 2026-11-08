@@ -56,6 +56,7 @@ export const RCLONE_CONFIG_PATH = process.env.RCLONE_CONFIG
   ? path.resolve(process.env.RCLONE_CONFIG)
   : path.join(CONFIG_DIR, 'rclone', 'rclone.conf');
 export const UPLOAD_TEMP_DIR = path.join(CONFIG_DIR, 'tmp_uploads');
+export const LOGS_DIR = path.join(CONFIG_DIR, 'logs');
 export const TASKS_DB_PATH = path.join(CONFIG_DIR, 'tasks.json');
 export const SCHEDULES_DB_PATH = path.join(CONFIG_DIR, 'schedules.json');
 export const SETTINGS_DB_PATH = path.join(CONFIG_DIR, 'settings.json');
@@ -99,7 +100,13 @@ export function getExtraLocalMounts(): CustomLocalMount[] {
 }
 
 export function ensureDirectoriesAndDefaults(): void {
-  for (const dir of [CONFIG_DIR, path.dirname(RCLONE_CONFIG_PATH), MEDIA_DIR, UPLOAD_TEMP_DIR]) {
+  for (const dir of [
+    CONFIG_DIR,
+    path.dirname(RCLONE_CONFIG_PATH),
+    MEDIA_DIR,
+    UPLOAD_TEMP_DIR,
+    LOGS_DIR,
+  ]) {
     try {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });

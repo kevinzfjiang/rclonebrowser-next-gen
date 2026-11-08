@@ -478,6 +478,21 @@ app.delete('/api/tasks/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+app.get('/api/tasks/:id/log', (req: Request, res: Response) => {
+  try {
+    const { filePath, fileName } = taskManager.getTaskLogFilePath(String(req.params.id));
+    const inline = req.query.inline === '1' || req.query.inline === 'true';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(fileName)}`
+    );
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err: any) {
+    res.status(404).json({ error: err.message || 'Log file not found' });
+  }
+});
+
 // --- Cron Scheduler Endpoints ---
 app.get('/api/schedules', (_req: Request, res: Response) => {
   res.json({ schedules: schedulerService.listSchedules() });
