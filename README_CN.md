@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀 (中文文档)
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.4-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.5-0284c7.svg)](./version.json)
 [![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,14 +11,14 @@
 
 彻底告别笨重的 **X11 + Openbox + noVNC + Qt5 桌面画面转发** 方案，采用 **现代原生 Web 前后端 (React + TypeScript + Tailwind CSS + Node.js) + 官方 Rclone 引擎** 构建，并打包为超轻量级 Alpine Docker 容器，同时 **100% 兼容旧版容器的端口 (`5800`) 与挂载目录 (`/config`、`/media`)**。
 
-- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.4`)
+- 🐳 **Docker Hub 镜像**：[`yadiman/rclonebrowser-next-gen`](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen) (`latest` / `2.5`)
 - 📦 **GitHub 仓库**：[kevinzfjiang/rclonebrowser-next-gen](https://github.com/kevinzfjiang/rclonebrowser-next-gen)
 
 ---
 
 ## ✨ 为什么升级到 RcloneBrowser Next Gen？
 
-| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.4`)** |
+| 维度 | 旧版 RcloneBrowser 容器 (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.5`)** |
 | :--- | :--- | :--- |
 | **交互体验** | 基于 X11/noVNC 远程桌面视频流，高延迟、字体发虚、移动端无法操作 | **原生响应式 Web 界面**，60fps 丝滑交互，内置 5 套主题风格与中/繁/英三语切换 |
 | **底层依赖** | 需在 Alpine 中强装 `glibc`、编译已停更的 C++/Qt5 `Alkl58/RcloneBrowser` | **纯静态编译官方 Rclone + Node.js 26 LTS Alpine 运行时**，零 X11/Qt5 依赖，构建快速稳定 |
@@ -29,7 +29,7 @@
 
 ---
 
-## 🛠️ 核心功能 (v2.4)
+## 🛠️ 核心功能 (v2.5)
 
 1. **多标签 & 双栏 Commander 文件资源管理器 (`Explorer`)**
    - 支持 **双栏对比模式 (Split Commander)** 与 **单栏模式** 一键切换，每栏均支持独立多标签页。

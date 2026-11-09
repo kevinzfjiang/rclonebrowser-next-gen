@@ -1,7 +1,7 @@
 # RcloneBrowser Next Gen 🚀
 
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-yadiman%2Frclonebrowser--next--gen-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/yadiman/rclonebrowser-next-gen)
-[![Version](https://img.shields.io/badge/version-2.4-0284c7.svg)](./version.json)
+[![Version](https://img.shields.io/badge/version-2.5-0284c7.svg)](./version.json)
 [![Node.js](https://img.shields.io/badge/Node.js-26%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 
@@ -18,7 +18,7 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ## ✨ Why Upgrade to RcloneBrowser Next Gen?
 
-| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.4`)** |
+| Dimension | Legacy `rclonebrowser` (`jlesage/baseimage-gui`) | **RcloneBrowser Next Gen (`v2.5`)** |
 | :--- | :--- | :--- |
 | **UI Experience** | X11/noVNC remote desktop video stream; blurry fonts, high latency, unusable on mobile | **Native 60fps Web UI** with drag-and-drop upload, inline preview, 5 themes & 3 languages |
 | **Architecture** | Requires `glibc` hacks on Alpine and compiling unmaintained C++/Qt5 `Alkl58/RcloneBrowser` | **Static official Rclone binary + Node.js 26 LTS Alpine runtime**; zero X11/Qt5 bloat |
@@ -29,7 +29,7 @@ Instead of streaming a heavy X11 + Openbox + noVNC + Qt5 desktop session over th
 
 ---
 
-## 🛠️ Key Features (v2.4)
+## 🛠️ Key Features (v2.5)
 
 1. **Multi-Tab & Dual-Pane Commander File Explorer (`Explorer`)**
    - Switch between **Dual-Pane Commander** and **Single-Pane** layouts with independent multi-tab bars per pane.

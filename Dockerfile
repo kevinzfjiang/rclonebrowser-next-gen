@@ -20,9 +20,9 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 # -----------------------------------------------------------------------------
-# Stage 2: Lightweight Node.js 26 LTS Alpine Runtime + Official Rclone Engine
+# Stage 2: Lightweight Alpine 3.24 Runtime + Node.js 26 LTS + Official Rclone
 # -----------------------------------------------------------------------------
-FROM node:26-alpine
+FROM alpine:3.24
 
 ARG RCLONE_VERSION=current
 ARG TARGETARCH=amd64
@@ -37,9 +37,10 @@ ENV APP_NAME="RcloneBrowser Next Gen" \
     MEDIA_DIR="/media" \
     RCLONE_CONFIG="/config/rclone/rclone.conf"
 
-# Install runtime dependencies & latest official Rclone binary
+# Install minimal Node.js 26 LTS runtime (nodejs-current) & latest official Rclone binary
 RUN apk update && \
     apk add --no-cache \
+      nodejs-current \
       ca-certificates \
       curl \
       wget \
@@ -85,7 +86,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 LABEL org.opencontainers.image.title="RcloneBrowser Next Gen" \
       org.opencontainers.image.description="Modern Native Web GUI for Rclone in Docker" \
-      org.opencontainers.image.version="2.4" \
+      org.opencontainers.image.version="2.5" \
       org.opencontainers.image.source="https://github.com/kevinzfjiang/rclonebrowser-next-gen"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -21,7 +21,7 @@ import { authService, AuthError } from './authService.js';
 
 async function runSmokeTests() {
   console.log(`🧪 Starting RcloneBrowser Next Gen v${APP_VERSION} Integration Smoke Tests...`);
-  assert.strictEqual(APP_VERSION, '2.4', 'APP_VERSION should be loaded from version.json as 2.4');
+  assert.strictEqual(APP_VERSION, '2.5', 'APP_VERSION should be loaded from version.json as 2.5');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.77.0'), true, 'v1.77.0 > v1.76.0');
   assert.strictEqual(isNewerRcloneVersion('v1.76.0', 'v1.76.0'), false, 'v1.76.0 == v1.76.0');
   ensureDirectoriesAndDefaults();

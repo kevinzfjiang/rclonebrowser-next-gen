@@ -267,7 +267,7 @@ export const App: React.FC = () => {
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
-  const displayAppVersion = systemStatus?.appVersion || '2.4';
+  const displayAppVersion = systemStatus?.appVersion || '2.5';
   const activeFilterCount = useMemo(
     () => parseExcludePatterns(globalExclude).length,
     [globalExclude]
