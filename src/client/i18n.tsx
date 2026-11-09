@@ -10,11 +10,11 @@ export const LOCALE_OPTIONS: { code: LocaleCode; label: string }[] = [
 ];
 
 export const THEME_OPTIONS: { id: ThemeId; zhCN: string; zhTW: string; en: string }[] = [
-  { id: 'slate', zhCN: '经典深色 (Slate)', zhTW: '經典深色 (Slate)', en: 'Slate Dark' },
-  { id: 'light', zhCN: '浅色明亮 (Light)', zhTW: '淺色明亮 (Light)', en: 'Light Mode' },
-  { id: 'cyberpunk', zhCN: '赛博朋克 (Cyberpunk)', zhTW: '賽博朋克 (Cyberpunk)', en: 'Cyberpunk Neon' },
-  { id: 'oled', zhCN: '纯粹深黑 (OLED Black)', zhTW: '純粹深黑 (OLED Black)', en: 'OLED Pure Black' },
-  { id: 'nord', zhCN: '极地冰蓝 (Nord)', zhTW: '極地冰藍 (Nord)', en: 'Nordic Frost' },
+  { id: 'slate', zhCN: '经典深色', zhTW: '經典深色', en: 'Slate Dark' },
+  { id: 'light', zhCN: '浅色明亮', zhTW: '淺色明亮', en: 'Light' },
+  { id: 'cyberpunk', zhCN: '赛博朋克', zhTW: '賽博朋克', en: 'Cyberpunk' },
+  { id: 'oled', zhCN: '纯粹深黑', zhTW: '純粹深黑', en: 'OLED Black' },
+  { id: 'nord', zhCN: '极地冰蓝', zhTW: '極地冰藍', en: 'Nordic' },
 ];
 
 interface AppPreferencesContextValue {

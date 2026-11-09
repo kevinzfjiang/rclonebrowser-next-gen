@@ -7,6 +7,7 @@ import {
   CheckSquare,
   ChevronRight,
   Cloud,
+  Columns,
   Copy,
   Download,
   Edit3,
@@ -24,6 +25,7 @@ import {
   HardDrive,
   Home,
   Loader2,
+  Maximize2,
   MoveRight,
   Music,
   Plus,
@@ -71,6 +73,8 @@ interface FilePaneProps {
   globalExclude?: string;
   hideFilteredInExplorer?: boolean;
   onOpenFilterModal?: () => void;
+  dualPane?: boolean;
+  onToggleDualPane?: () => void;
 }
 
 export const FilePane: React.FC<FilePaneProps> = ({
@@ -87,6 +91,8 @@ export const FilePane: React.FC<FilePaneProps> = ({
   globalExclude = '',
   hideFilteredInExplorer = true,
   onOpenFilterModal,
+  dualPane = true,
+  onToggleDualPane,
 }) => {
   const { tr } = useI18n();
   const activeTab = useMemo(
@@ -501,53 +507,78 @@ export const FilePane: React.FC<FilePaneProps> = ({
       }}
     >
       {/* Multi-Tab Bar */}
-      <div className="flex items-center bg-slate-950/90 border-b border-slate-800/80 px-2 pt-1.5 gap-1 overflow-x-auto">
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTab.id;
-          const folderLabel = tab.path ? tab.path.split('/').pop() : '/';
-          const isLocalMount = tab.remote.startsWith('@');
-          const remoteLabel =
-            tab.remote === '@media'
-              ? tr('本地 /media', '本機 /media', 'Local /media')
-              : isLocalMount
-                ? `${tr('本地', '本機', 'Local')} ${tab.remote.slice(1)}`
-                : `${tab.remote}:`;
-          return (
-            <div
-              key={tab.id}
-              onClick={() => onTabsChange(tabs, tab.id)}
-              className={`group flex items-center gap-2 px-3 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer border-t border-x transition-all max-w-[200px] shrink-0 ${
-                isActive
-                  ? 'bg-slate-900 text-sky-400 border-slate-700/80'
-                  : 'bg-slate-950/40 text-slate-400 border-transparent hover:bg-slate-900/50 hover:text-slate-200'
-              }`}
-            >
-              {isLocalMount ? (
-                <HardDrive className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-              ) : (
-                <Cloud className="w-3.5 h-3.5 shrink-0 text-sky-400" />
-              )}
-              <span className="truncate">
-                {remoteLabel} {folderLabel}
-              </span>
-              {tabs.length > 1 && (
-                <button
-                  onClick={(e) => handleCloseTab(tab.id, e)}
-                  className="opacity-60 hover:opacity-100 hover:bg-slate-800 rounded p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          );
-        })}
-        <button
-          onClick={handleAddTab}
-          title={tr('新建标签页', '新增分頁', 'New Tab')}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors shrink-0 mb-1"
-        >
-          <Plus className="w-3.5 h-3.5" />
-        </button>
+      <div className="flex items-center justify-between bg-slate-950/90 border-b border-slate-800/80 px-2 pt-1.5 gap-2">
+        <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTab.id;
+            const folderLabel = tab.path ? tab.path.split('/').pop() : '/';
+            const isLocalMount = tab.remote.startsWith('@');
+            const remoteLabel =
+              tab.remote === '@media'
+                ? tr('本地 /media', '本機 /media', 'Local /media')
+                : isLocalMount
+                  ? `${tr('本地', '本機', 'Local')} ${tab.remote.slice(1)}`
+                  : `${tab.remote}:`;
+            return (
+              <div
+                key={tab.id}
+                onClick={() => onTabsChange(tabs, tab.id)}
+                className={`group flex items-center gap-2 px-3 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer border-t border-x transition-all max-w-[200px] shrink-0 ${
+                  isActive
+                    ? 'bg-slate-900 text-sky-400 border-slate-700/80'
+                    : 'bg-slate-950/40 text-slate-400 border-transparent hover:bg-slate-900/50 hover:text-slate-200'
+                }`}
+              >
+                {isLocalMount ? (
+                  <HardDrive className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                ) : (
+                  <Cloud className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                )}
+                <span className="truncate">
+                  {remoteLabel} {folderLabel}
+                </span>
+                {tabs.length > 1 && (
+                  <button
+                    onClick={(e) => handleCloseTab(tab.id, e)}
+                    className="opacity-60 hover:opacity-100 hover:bg-slate-800 rounded p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            onClick={handleAddTab}
+            title={tr('新建标签页', '新增分頁', 'New Tab')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors shrink-0 mb-1"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {onToggleDualPane && (
+          <button
+            onClick={onToggleDualPane}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 mb-1 rounded-lg text-[11px] font-medium border transition-colors shrink-0 whitespace-nowrap ${
+              dualPane
+                ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/30'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+            }`}
+            title={tr(
+              '切换双栏 Commander 对比视图 / 单栏视图',
+              '切換雙欄 Commander 對比檢視 / 單欄檢視',
+              'Toggle Dual-Pane Commander / Single-Pane View'
+            )}
+          >
+            {dualPane ? <Columns className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <span>
+              {dualPane
+                ? tr('双栏视图', '雙欄檢視', 'Dual-Pane')
+                : tr('单栏视图', '單欄檢視', 'Single-Pane')}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Remote Selector & Breadcrumb Navigation */}

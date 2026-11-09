@@ -4,13 +4,11 @@ import {
   CalendarClock,
   CheckCircle2,
   Cloud,
-  Columns,
   Filter,
   FolderTree,
   Globe,
   Lock,
   LogOut,
-  Maximize2,
   Palette,
   Shield,
   Terminal,
@@ -389,52 +387,47 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
-      {/* Top Navigation Header */}
-      <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-900/90 border-b border-slate-800/90 shrink-0">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-700 flex items-center justify-center shadow-lg shadow-sky-600/20">
-            <Cloud className="w-5 h-5 text-white" />
+      {/* Top Navigation Header: 3-column grid locks center navigation in place */}
+      <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-2 bg-slate-900/90 border-b border-slate-800/90 shrink-0">
+        {/* Left: Brand Logo */}
+        <div className="flex items-center gap-2.5 justify-self-start min-w-0 whitespace-nowrap">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-700 flex items-center justify-center shadow-lg shadow-sky-600/20 shrink-0">
+            <Cloud className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight text-slate-100">
-                RcloneBrowser <span className="text-sky-400">Next Gen</span>
-              </h1>
-              <span className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] font-mono text-sky-300">
-                v{displayAppVersion}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block">
-              Modern Native Web GUI for Rclone • Drop-in Docker Container
-            </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-sm font-bold tracking-tight text-slate-100 truncate">
+              RcloneBrowser <span className="text-sky-400">Next Gen</span>
+            </h1>
+            <span className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] font-mono text-sky-300 shrink-0">
+              v{displayAppVersion}
+            </span>
           </div>
         </div>
 
-        {/* Center Main Navigation */}
-        <nav className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+        {/* Center: Main Navigation (Always anchored at dead-center) */}
+        <nav className="justify-self-center flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 whitespace-nowrap">
           <button
             onClick={() => setActiveNav('explorer')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeNav === 'explorer'
                 ? 'bg-sky-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <FolderTree className="w-4 h-4" />
-            <span>{tr('文件管理器', '檔案管理員', 'Explorer')}</span>
+            <FolderTree className="w-3.5 h-3.5 shrink-0" />
+            <span>{tr('文件管理', '檔案管理', 'Explorer')}</span>
           </button>
 
           <button
             onClick={() => setActiveNav('tasks')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeNav === 'tasks'
                 ? 'bg-sky-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <Activity className="w-4 h-4" />
-            <span>{tr('传输与同步中心', '傳輸與同步中心', 'Transfers')}</span>
+            <Activity className="w-3.5 h-3.5 shrink-0" />
+            <span>{tr('传输中心', '傳輸中心', 'Transfers')}</span>
             {activeTasksCount > 0 ? (
               <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold animate-pulse">
                 {activeTasksCount}
@@ -448,14 +441,14 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveNav('remotes')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeNav === 'remotes'
                 ? 'bg-sky-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <Cloud className="w-4 h-4" />
-            <span>{tr('存储源配置 (Remotes)', '儲存源設定 (Remotes)', 'Remotes')}</span>
+            <Cloud className="w-3.5 h-3.5 shrink-0" />
+            <span>{tr('存储源', '儲存源', 'Remotes')}</span>
             <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 text-[10px]">
               {remotes.length}
             </span>
@@ -463,14 +456,14 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveNav('schedules')}
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeNav === 'schedules'
                 ? 'bg-sky-600 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <CalendarClock className="w-4 h-4" />
-            <span>{tr('定时任务 (Cron)', '排程任務 (Cron)', 'Scheduler')}</span>
+            <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+            <span>{tr('定时任务', '排程任務', 'Scheduler')}</span>
             {enabledSchedulesCount > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px]">
                 {enabledSchedulesCount}
@@ -479,31 +472,8 @@ export const App: React.FC = () => {
           </button>
         </nav>
 
-        {/* Right Controls: Dual-Pane Toggle, Theme Selector, Language Selector, Logout */}
-        <div className="flex items-center gap-2">
-          {activeNav === 'explorer' && (
-            <button
-              onClick={() => setDualPane(!dualPane)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                dualPane
-                  ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-              title={tr(
-                '切换双栏 Commander 对比视图 / 单栏视图',
-                '切換雙欄 Commander 對比檢視 / 單欄檢視',
-                'Toggle Dual-Pane Commander / Single-Pane View'
-              )}
-            >
-              {dualPane ? <Columns className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              <span className="hidden xl:inline">
-                {dualPane
-                  ? tr('双栏 Commander', '雙欄 Commander', 'Dual-Pane')
-                  : tr('单栏浏览', '單欄瀏覽', 'Single-Pane')}
-              </span>
-            </button>
-          )}
-
+        {/* Right: Global Controls (Theme, Language, Filter Rules, Security Center, Logout) */}
+        <div className="flex items-center gap-1.5 justify-self-end whitespace-nowrap">
           {/* Theme Selector */}
           <div className="relative flex items-center">
             <Palette className="w-3.5 h-3.5 text-sky-400 absolute left-2.5 pointer-events-none" />
@@ -548,8 +518,8 @@ export const App: React.FC = () => {
             )}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-950 border border-slate-800 text-sky-400 hover:border-sky-500/50 transition-colors"
           >
-            <Filter className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">
+            <Filter className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden lg:inline">
               {tr('过滤规则', '過濾規則', 'Filters')}
             </span>
             {activeFilterCount > 0 && (
@@ -573,8 +543,8 @@ export const App: React.FC = () => {
                 : 'bg-amber-950/30 border-amber-700/50 text-amber-300 hover:border-amber-500'
             }`}
           >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">
+            <Shield className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden lg:inline">
               {tr('安全中心', '安全中心', 'Security')}
             </span>
           </button>
@@ -620,6 +590,8 @@ export const App: React.FC = () => {
               globalExclude={globalExclude}
               hideFilteredInExplorer={hideFilteredInExplorer}
               onOpenFilterModal={() => setFilterModalOpen(true)}
+              dualPane={dualPane}
+              onToggleDualPane={() => setDualPane(!dualPane)}
             />
 
             {dualPane && (
@@ -644,6 +616,8 @@ export const App: React.FC = () => {
                 globalExclude={globalExclude}
                 hideFilteredInExplorer={hideFilteredInExplorer}
                 onOpenFilterModal={() => setFilterModalOpen(true)}
+                dualPane={dualPane}
+                onToggleDualPane={() => setDualPane(!dualPane)}
               />
             )}
           </div>
