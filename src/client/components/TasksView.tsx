@@ -596,10 +596,42 @@ export const TasksView: React.FC<TasksViewProps> = ({
                   </div>
                 )}
 
-                {/* Error Alert */}
-                {task.error && (
-                  <div className="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/50 rounded-lg px-3 py-2 font-mono">
-                    {tr('错误详情', '錯誤詳情', 'Error')}: {task.error}
+                {/* Error Alert & Failed Files List */}
+                {(task.error || (task.failedFiles && task.failedFiles.length > 0)) && (
+                  <div className="text-xs text-rose-300 bg-rose-950/30 border border-rose-800/50 rounded-lg p-3 space-y-2">
+                    {task.failedFiles && task.failedFiles.length > 0 ? (
+                      <>
+                        <div className="flex items-center justify-between font-semibold text-rose-200">
+                          <span className="flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                            <span>
+                              {tr(
+                                `以下 ${task.failedFiles.length} 个文件传输失败：`,
+                                `以下 ${task.failedFiles.length} 個檔案傳輸失敗：`,
+                                `Failed to transfer ${task.failedFiles.length} file(s):`
+                              )}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 font-mono text-[11px]">
+                          {task.failedFiles.map((ff, idx) => (
+                            <div
+                              key={`${ff.file}-${idx}`}
+                              className="p-2 rounded bg-slate-950/80 border border-rose-900/60 flex flex-col gap-0.5 select-text"
+                            >
+                              <span className="text-rose-200 font-semibold break-all">
+                                📄 {ff.file}
+                              </span>
+                              <span className="text-rose-400/90 break-all">{ff.error}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="font-mono select-text">
+                        {tr('错误详情', '錯誤詳情', 'Error')}: {task.error}
+                      </div>
+                    )}
                   </div>
                 )}
 

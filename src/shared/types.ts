@@ -79,6 +79,12 @@ export interface ActiveTransferringFile {
   speed: number;
 }
 
+export interface FailedTransferFile {
+  file: string;
+  error: string;
+  timestamp: string;
+}
+
 export interface TransferTask {
   id: string;
   name: string;
@@ -99,6 +105,7 @@ export interface TransferTask {
   totalChecks: number;
   errorsCount: number;
   activeFiles: ActiveTransferringFile[];
+  failedFiles?: FailedTransferFile[];
   options: TransferOptions;
   createdAt: string;
   startedAt?: string;

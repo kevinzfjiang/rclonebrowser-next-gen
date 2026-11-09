@@ -226,6 +226,7 @@ class TaskManager {
       totalChecks: 0,
       errorsCount: 0,
       activeFiles: [],
+      failedFiles: [],
       options: params.options || {},
       createdAt: now.toISOString(),
       logs: [],
@@ -734,13 +735,49 @@ class TaskManager {
           }
         } else if (parsed.msg) {
           const level = (parsed.level || 'info').toUpperCase();
-          const objPrefix = parsed.object ? `[${parsed.object}] ` : '';
+          const objName = parsed.object ? String(parsed.object).trim() : '';
+          const objPrefix = objName ? `[${objName}] ` : '';
           const msgClean = String(parsed.msg).trim();
           if (!msgClean.startsWith('Transferred:')) {
             this.appendLog(task, `[${level}] ${objPrefix}${msgClean}`);
           }
+
+          if (!task.failedFiles) {
+            task.failedFiles = [];
+          }
+
+          // If a file that failed on an earlier attempt succeeds on a subsequent retry, remove it from failedFiles
+          if (
+            level === 'INFO' &&
+            objName &&
+            (msgClean.startsWith('Copied') || msgClean.startsWith('Moved'))
+          ) {
+            task.failedFiles = task.failedFiles.filter((f) => f.file !== objName);
+          }
+
           if (parsed.level === 'error' || parsed.level === 'critical') {
-            task.error = msgClean;
+            if (objName) {
+              const existingIdx = task.failedFiles.findIndex((f) => f.file === objName);
+              const entry = {
+                file: objName,
+                error: msgClean,
+                timestamp: new Date().toISOString(),
+              };
+              if (existingIdx >= 0) {
+                task.failedFiles[existingIdx] = entry;
+              } else if (task.failedFiles.length < 100) {
+                task.failedFiles.push(entry);
+              }
+              task.error = `[${objName}] ${msgClean}`;
+            } else {
+              const isGenericRetrySummary =
+                msgClean.startsWith('Attempt ') ||
+                msgClean.startsWith('not deleting ') ||
+                msgClean.startsWith('march: ');
+              if (!task.error || (!isGenericRetrySummary && task.failedFiles.length === 0)) {
+                task.error = msgClean;
+              }
+            }
           }
         }
       } catch {
@@ -811,9 +848,17 @@ class TaskManager {
         task.activeFiles = [];
         task.completedAt = new Date().toISOString();
         if (!task.error) {
-          task.error = `Rclone 退出码异常 (Exit Code ${code})`;
+          task.error = `Rclone exited with code ${code}`;
         }
-        this.appendLog(task, `[FAILED] 任务失败 (Exit Code ${code})`);
+        if (task.failedFiles && task.failedFiles.length > 0) {
+          this.appendLog(
+            task,
+            `[FAILED FILES] ${task.failedFiles.length} file(s) failed: ${task.failedFiles
+              .map((f) => f.file)
+              .join(', ')}`
+          );
+        }
+        this.appendLog(task, `[FAILED] Task failed (Exit Code ${code})`);
       }
 
       this.saveState();
