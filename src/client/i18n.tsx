@@ -1,28 +1,72 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type LocaleCode = 'zh-CN' | 'zh-TW' | 'en';
 export type ThemeId = 'slate' | 'light' | 'cyberpunk' | 'oled' | 'nord';
 
-export const LOCALE_OPTIONS: { code: LocaleCode; label: string }[] = [
-  { code: 'zh-CN', label: '简体中文' },
-  { code: 'zh-TW', label: '繁體中文' },
-  { code: 'en', label: 'English' },
+export const LOCALE_OPTIONS: { code: LocaleCode; label: string; shortLabel: string }[] = [
+  { code: 'zh-CN', label: '简体中文', shortLabel: '简' },
+  { code: 'zh-TW', label: '繁體中文', shortLabel: '繁' },
+  { code: 'en', label: 'English', shortLabel: 'EN' },
 ];
 
-export const THEME_OPTIONS: { id: ThemeId; zhCN: string; zhTW: string; en: string }[] = [
-  { id: 'slate', zhCN: '经典深色', zhTW: '經典深色', en: 'Slate Dark' },
-  { id: 'light', zhCN: '浅色明亮', zhTW: '淺色明亮', en: 'Light' },
-  { id: 'cyberpunk', zhCN: '赛博朋克', zhTW: '賽博朋克', en: 'Cyberpunk' },
-  { id: 'oled', zhCN: '纯粹深黑', zhTW: '純粹深黑', en: 'OLED Black' },
-  { id: 'nord', zhCN: '极地冰蓝', zhTW: '極地冰藍', en: 'Nordic' },
+export const THEME_OPTIONS: {
+  id: ThemeId;
+  zhCN: string;
+  zhTW: string;
+  en: string;
+  swatchBg: string;
+  swatchAccent: string;
+}[] = [
+  {
+    id: 'slate',
+    zhCN: '经典深色',
+    zhTW: '經典深色',
+    en: 'Slate Dark',
+    swatchBg: '#0f172a',
+    swatchAccent: '#0ea5e9',
+  },
+  {
+    id: 'light',
+    zhCN: '浅色明亮',
+    zhTW: '淺色明亮',
+    en: 'Light',
+    swatchBg: '#f1f5f9',
+    swatchAccent: '#0284c7',
+  },
+  {
+    id: 'oled',
+    zhCN: '纯粹深黑',
+    zhTW: '純粹深黑',
+    en: 'OLED Black',
+    swatchBg: '#000000',
+    swatchAccent: '#38bdf8',
+  },
+  {
+    id: 'nord',
+    zhCN: '极地冰蓝',
+    zhTW: '極地冰藍',
+    en: 'Nordic',
+    swatchBg: '#2e3440',
+    swatchAccent: '#88c0d0',
+  },
+  {
+    id: 'cyberpunk',
+    zhCN: '赛博朋克',
+    zhTW: '賽博朋克',
+    en: 'Cyberpunk',
+    swatchBg: '#16062c',
+    swatchAccent: '#f72585',
+  },
 ];
+
+export type TranslateFn = (zhCN: string, zhTW: string, en: string) => string;
 
 interface AppPreferencesContextValue {
   locale: LocaleCode;
   setLocale: (loc: LocaleCode) => void;
   theme: ThemeId;
   setTheme: (theme: ThemeId) => void;
-  tr: (zhCN: string, zhTW: string, en: string) => string;
+  tr: TranslateFn;
 }
 
 const LOCALE_STORAGE_KEY = 'rclonebrowser_next_locale';
@@ -67,22 +111,28 @@ export const AppPreferencesProvider: React.FC<{ children: React.ReactNode }> = (
     }
   }, [theme]);
 
-  const tr = (zhCN: string, zhTW: string, en: string): string => {
-    if (locale === 'zh-TW') return zhTW;
-    if (locale === 'en') return en;
-    return zhCN;
-  };
+  const tr = useCallback<TranslateFn>(
+    (zhCN: string, zhTW: string, en: string): string => {
+      if (locale === 'zh-TW') return zhTW;
+      if (locale === 'en') return en;
+      return zhCN;
+    },
+    [locale]
+  );
+
+  const value = useMemo(
+    () => ({
+      locale,
+      setLocale: setLocaleState,
+      theme,
+      setTheme: setThemeState,
+      tr,
+    }),
+    [locale, theme, tr]
+  );
 
   return (
-    <AppPreferencesContext.Provider
-      value={{
-        locale,
-        setLocale: setLocaleState,
-        theme,
-        setTheme: setThemeState,
-        tr,
-      }}
-    >
+    <AppPreferencesContext.Provider value={value}>
       {children}
     </AppPreferencesContext.Provider>
   );

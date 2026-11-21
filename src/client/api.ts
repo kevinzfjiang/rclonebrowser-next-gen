@@ -25,6 +25,13 @@ export function setAuthToken(token: string): void {
   }
 }
 
+export interface UploadProgressInfo {
+  loaded: number;
+  total: number;
+  percent: number;
+  speed: number; // bytes/sec
+}
+
 async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -93,7 +100,8 @@ export const api = {
     }),
 
   // System
-  getSystemStatus: () => requestJson<SystemStatus>('/api/system/status'),
+  getSystemStatus: (signal?: AbortSignal) =>
+    requestJson<SystemStatus>('/api/system/status', { signal }),
 
   setGlobalBwLimit: (bwlimit: string) =>
     requestJson<{ globalBwLimit: string }>('/api/system/bwlimit', {
@@ -108,8 +116,10 @@ export const api = {
     }),
 
   // Remotes & Config
-  getRemotes: () =>
-    requestJson<{ remotes: RemoteInfo[]; templates: RemoteProviderTemplate[] }>('/api/remotes'),
+  getRemotes: (signal?: AbortSignal) =>
+    requestJson<{ remotes: RemoteInfo[]; templates: RemoteProviderTemplate[] }>('/api/remotes', {
+      signal,
+    }),
 
   upsertRemote: (payload: {
     name: string;
@@ -127,8 +137,8 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getRemoteQuota: (name: string) =>
-    requestJson<StorageQuota>(`/api/remotes/${encodeURIComponent(name)}/quota`),
+  getRemoteQuota: (name: string, signal?: AbortSignal) =>
+    requestJson<StorageQuota>(`/api/remotes/${encodeURIComponent(name)}/quota`, { signal }),
 
   getRawConfig: () => requestJson<{ path: string; content: string }>('/api/config/raw'),
 
@@ -139,9 +149,10 @@ export const api = {
     }),
 
   // File System
-  listDirectory: (remote: string, path: string) =>
+  listDirectory: (remote: string, path: string, signal?: AbortSignal) =>
     requestJson<{ remote: string; path: string; entries: FileEntry[] }>(
-      `/api/fs/list?remote=${encodeURIComponent(remote)}&path=${encodeURIComponent(path)}`
+      `/api/fs/list?remote=${encodeURIComponent(remote)}&path=${encodeURIComponent(path)}`,
+      { signal }
     ),
 
   makeDirectory: (remote: string, path: string) =>
@@ -168,14 +179,100 @@ export const api = {
       body: JSON.stringify({ remote, path }),
     }),
 
-  uploadFiles: (remote: string, path: string, files: FileList | File[]) => {
-    const formData = new FormData();
-    formData.append('remote', remote);
-    formData.append('path', path);
-    Array.from(files).forEach((f) => formData.append('files', f));
-    return requestJson<{ success: boolean; count: number }>('/api/fs/upload', {
-      method: 'POST',
-      body: formData,
+  uploadFiles: (
+    remote: string,
+    path: string,
+    files: FileList | File[],
+    options?: {
+      onProgress?: (info: UploadProgressInfo) => void;
+      signal?: AbortSignal;
+    }
+  ): Promise<{ success: boolean; count: number }> => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('remote', remote);
+      formData.append('path', path);
+      Array.from(files).forEach((f) => formData.append('files', f));
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/fs/upload', true);
+      const token = getAuthToken();
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      const startedAt = Date.now();
+      let lastLoaded = 0;
+      let lastTime = startedAt;
+
+      xhr.upload.onprogress = (evt) => {
+        if (!options?.onProgress || !evt.lengthComputable) return;
+        const now = Date.now();
+        const dt = (now - lastTime) / 1000;
+        const speed =
+          dt >= 0.25
+            ? Math.max(0, (evt.loaded - lastLoaded) / dt)
+            : Math.max(0, evt.loaded / Math.max(0.1, (now - startedAt) / 1000));
+        if (dt >= 0.25) {
+          lastLoaded = evt.loaded;
+          lastTime = now;
+        }
+        options.onProgress({
+          loaded: evt.loaded,
+          total: evt.total,
+          percent: evt.total > 0 ? Math.min(100, Math.round((evt.loaded / evt.total) * 100)) : 0,
+          speed,
+        });
+      };
+
+      const onAbort = () => {
+        xhr.abort();
+      };
+
+      if (options?.signal) {
+        if (options.signal.aborted) {
+          reject(new DOMException('Upload aborted', 'AbortError'));
+          return;
+        }
+        options.signal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      const cleanup = () => {
+        if (options?.signal) {
+          options.signal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      xhr.onload = () => {
+        cleanup();
+        let data: any = {};
+        try {
+          data = JSON.parse(xhr.responseText || '{}');
+        } catch {
+          data = {};
+        }
+        if (xhr.status === 401) {
+          reject(new Error('UNAUTHORIZED'));
+          return;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data as { success: boolean; count: number });
+        } else {
+          reject(new Error(data.error || `Request failed (HTTP ${xhr.status})`));
+        }
+      };
+
+      xhr.onerror = () => {
+        cleanup();
+        reject(new Error('Network error during upload'));
+      };
+
+      xhr.onabort = () => {
+        cleanup();
+        reject(new DOMException('Upload cancelled', 'AbortError'));
+      };
+
+      xhr.send(formData);
     });
   },
 
@@ -193,13 +290,13 @@ export const api = {
   },
 
   // Tasks
-  getTasks: () =>
+  getTasks: (signal?: AbortSignal) =>
     requestJson<{
       tasks: TransferTask[];
       activeStats: { activeTasksCount: number; totalSpeed: number };
       globalBwLimit: string;
       globalExclude: string;
-    }>('/api/tasks'),
+    }>('/api/tasks', { signal }),
 
   createTask: (payload: {
     name?: string;
@@ -258,7 +355,8 @@ export const api = {
   },
 
   // Schedules
-  getSchedules: () => requestJson<{ schedules: ScheduleJob[] }>('/api/schedules'),
+  getSchedules: (signal?: AbortSignal) =>
+    requestJson<{ schedules: ScheduleJob[] }>('/api/schedules', { signal }),
 
   createSchedule: (payload: {
     name: string;

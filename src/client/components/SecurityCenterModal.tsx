@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
-  Lock,
   LogOut,
   Shield,
-  ShieldAlert,
   ShieldCheck,
   Terminal,
   Unlock,
@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { api, setAuthToken } from '../api';
 import { useI18n } from '../i18n';
+import { ALERT_TONES } from '../utils/themeStyles';
+import { Modal } from './ui/Modal';
 
 interface SecurityCenterModalProps {
   isOpen: boolean;
@@ -49,6 +51,8 @@ export const SecurityCenterModal: React.FC<SecurityCenterModalProps> = ({
   const [currentPassword, setCurrentPassword] = useState(recentLoginPassword || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,11 +63,11 @@ export const SecurityCenterModal: React.FC<SecurityCenterModalProps> = ({
       setCurrentPassword(recentLoginPassword || '');
       setNewPassword('');
       setConfirmPassword('');
+      setShowCurrentPw(false);
+      setShowNewPw(false);
       setError(null);
     }
   }, [isOpen, currentUsername, authRequired, forcedFirstLogin, recentLoginPassword]);
-
-  if (!isOpen) return null;
 
   const requiresNewPassword = forcedFirstLogin && authEnabled;
 
@@ -172,193 +176,198 @@ export const SecurityCenterModal: React.FC<SecurityCenterModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-950/60 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div
-              className={`p-2.5 rounded-xl ${
-                forcedFirstLogin
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
-              }`}
-            >
-              {forcedFirstLogin ? (
-                <KeyRound className="w-5 h-5" />
-              ) : (
-                <Shield className="w-5 h-5" />
-              )}
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-100">
-                {forcedFirstLogin
-                  ? tr(
-                      '首次登录 — 请修改初始管理员密码',
-                      '首次登入 — 請修改初始管理員密碼',
-                      'First Login — Change Initial Password'
-                    )
-                  : tr(
-                      '安全与认证中心 (Security Center)',
-                      '安全與驗證中心 (Security Center)',
-                      'Security & Authentication Center'
-                    )}
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                {forcedFirstLogin
-                  ? tr(
-                      '出于安全考虑，请立即替换控制台生成的初始随机密码',
-                      '出於安全考量，請立即替換主控台產生的初始隨機密碼',
-                      'For security, please replace the console-generated initial password now'
-                    )
-                  : tr(
-                      '密码采用 Scrypt 加盐哈希存储于 /config/auth.json，告别明文环境变量',
-                      '密碼採用 Scrypt 加鹽雜湊儲存於 /config/auth.json，告別明文環境變數',
-                      'Salted scrypt hash stored in /config/auth.json — no plaintext env vars'
-                    )}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      closeDisabled={forcedFirstLogin || submitting}
+      maxWidthClass="max-w-lg"
+      ariaLabel={tr('安全与认证中心', '安全與驗證中心', 'Security & Authentication Center')}
+    >
+      {/* Modal Header */}
+      <div className="flex items-center justify-between px-6 py-4 bg-slate-950/60 border-b border-slate-800 shrink-0">
+        <div className="flex items-center gap-3">
+          <div
+            className={`p-2.5 rounded-xl ${
+              forcedFirstLogin
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+            }`}
+          >
+            {forcedFirstLogin ? (
+              <KeyRound className="w-5 h-5" />
+            ) : (
+              <Shield className="w-5 h-5" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-100">
+              {forcedFirstLogin
+                ? tr(
+                    '首次登录 — 请修改初始管理员密码',
+                    '首次登入 — 請修改初始管理員密碼',
+                    'First Login — Change Initial Password'
+                  )
+                : tr(
+                    '安全与认证中心 (Security Center)',
+                    '安全與驗證中心 (Security Center)',
+                    'Security & Authentication Center'
+                  )}
+            </h2>
+            <p className="text-[11px] text-slate-400">
+              {forcedFirstLogin
+                ? tr(
+                    '出于安全考虑，请立即替换控制台生成的初始随机密码',
+                    '出於安全考量，請立即替換主控台產生的初始隨機密碼',
+                    'For security, please replace the console-generated initial password now'
+                  )
+                : tr(
+                    '密码采用 Scrypt 加盐哈希存储于 /config/auth.json，告别明文环境变量',
+                    '密碼採用 Scrypt 加鹽雜湊儲存於 /config/auth.json，告別明文環境變數',
+                    'Salted scrypt hash stored in /config/auth.json — no plaintext env vars'
+                  )}
+            </p>
+          </div>
+        </div>
+
+        {!forcedFirstLogin ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={tr('关闭', '關閉', 'Close')}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onLogout}
+            title={tr('退出登录', '登出', 'Sign Out')}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-400 hover:text-rose-500 dark:hover:text-rose-400"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>{tr('退出', '登出', 'Sign Out')}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Modal Body */}
+      <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs overflow-y-auto">
+        {forcedFirstLogin && (
+          <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${ALERT_TONES.warning}`}>
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-[11px] leading-relaxed">
+              <p className="font-semibold">
+                {tr(
+                  '您正在使用容器首次启动生成的临时随机密码登录。',
+                  '您正在使用容器首次啟動產生的臨時隨機密碼登入。',
+                  'You signed in using the one-time initial password from container logs.'
+                )}
+              </p>
+              <p className="opacity-90">
+                {tr(
+                  '设置新密码后，初始密码将立即失效，且新密码仅以 Scrypt 加密哈希形式保存在 /config/auth.json 中。',
+                  '設定新密碼後，初始密碼將立即失效，且新密碼僅以 Scrypt 加密雜湊形式保存在 /config/auth.json 中。',
+                  'Once updated, the initial password is invalidated and only the salted scrypt hash is saved in /config/auth.json.'
+                )}
               </p>
             </div>
           </div>
+        )}
 
-          {!forcedFirstLogin ? (
+        {error && (
+          <div className={`p-3 rounded-xl border text-xs ${ALERT_TONES.error}`}>{error}</div>
+        )}
+
+        {/* Authentication Mode Toggle */}
+        <div>
+          <label className="block text-slate-300 font-medium mb-2">
+            {tr('访问认证模式', '存取驗證模式', 'Authentication Mode')}
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              onClick={() => setAuthEnabled(true)}
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                authEnabled
+                  ? 'bg-sky-500/15 border-sky-500 text-slate-100 shadow-sm'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
             >
-              <X className="w-4 h-4" />
+              <ShieldCheck
+                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                  authEnabled ? 'text-sky-600 dark:text-sky-400' : 'text-slate-500'
+                }`}
+              />
+              <div>
+                <div className="font-semibold text-xs">
+                  {tr('启用登录密码保护', '啟用登入密碼保護', 'Password Protected')}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {tr(
+                    '推荐：访问 Web 控制台需验证密码',
+                    '推薦：存取 Web 控制台需驗證密碼',
+                    'Recommended: Require login to access UI'
+                  )}
+                </div>
+              </div>
             </button>
-          ) : (
+
             <button
               type="button"
-              onClick={onLogout}
-              title={tr('退出登录', '登出', 'Sign Out')}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-400 hover:text-rose-400"
+              onClick={() => setAuthEnabled(false)}
+              className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
+                !authEnabled
+                  ? 'bg-amber-500/15 border-amber-500/80 text-slate-100 shadow-sm'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>{tr('退出', '登出', 'Sign Out')}</span>
+              <Unlock
+                className={`w-4 h-4 shrink-0 mt-0.5 ${
+                  !authEnabled ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500'
+                }`}
+              />
+              <div>
+                <div className="font-semibold text-xs">
+                  {tr('免密直连模式', '免密直連模式', 'Passwordless LAN Mode')}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {tr(
+                    '仅限受信任家庭内网：无需密码直接进入',
+                    '僅限受信任家庭內網：無需密碼直接進入',
+                    'Trusted home LAN only: Open access'
+                  )}
+                </div>
+              </div>
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
-          {forcedFirstLogin && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-950/30 border border-amber-700/50 text-amber-200">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div className="space-y-1 text-[11px] leading-relaxed">
-                <p className="font-semibold">
-                  {tr(
-                    '您正在使用容器首次启动生成的临时随机密码登录。',
-                    '您正在使用容器首次啟動產生的臨時隨機密碼登入。',
-                    'You signed in using the one-time initial password from container logs.'
-                  )}
-                </p>
-                <p className="text-amber-300/90">
-                  {tr(
-                    '设置新密码后，初始密码将立即失效，且新密码仅以 Scrypt 加密哈希形式保存在 /config/auth.json 中。',
-                    '設定新密碼後，初始密碼將立即失效，且新密碼僅以 Scrypt 加密雜湊形式保存在 /config/auth.json 中。',
-                    'Once updated, the initial password is invalidated and only the salted scrypt hash is saved in /config/auth.json.'
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
+        {/* Administrator Username */}
+        <div>
+          <label className="block text-slate-300 font-medium mb-1">
+            {tr('管理员用户名', '管理員使用者名稱', 'Administrator Username')}
+          </label>
+          <input
+            type="text"
+            required
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+          />
+        </div>
 
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300">
-              {error}
-            </div>
-          )}
-
-          {/* Authentication Mode Toggle */}
-          <div>
-            <label className="block text-slate-300 font-medium mb-2">
-              {tr('访问认证模式', '存取驗證模式', 'Authentication Mode')}
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setAuthEnabled(true)}
-                className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
-                  authEnabled
-                    ? 'bg-sky-600/15 border-sky-500 text-slate-100 shadow-sm'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <ShieldCheck
-                  className={`w-4 h-4 shrink-0 mt-0.5 ${
-                    authEnabled ? 'text-sky-400' : 'text-slate-500'
-                  }`}
-                />
-                <div>
-                  <div className="font-semibold text-xs">
-                    {tr('启用登录密码保护', '啟用登入密碼保護', 'Password Protected')}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    {tr(
-                      '推荐：访问 Web 控制台需验证密码',
-                      '推薦：存取 Web 控制台需驗證密碼',
-                      'Recommended: Require login to access UI'
-                    )}
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAuthEnabled(false)}
-                className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all ${
-                  !authEnabled
-                    ? 'bg-amber-500/15 border-amber-500/80 text-slate-100 shadow-sm'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                }`}
-              >
-                <Unlock
-                  className={`w-4 h-4 shrink-0 mt-0.5 ${
-                    !authEnabled ? 'text-amber-400' : 'text-slate-500'
-                  }`}
-                />
-                <div>
-                  <div className="font-semibold text-xs">
-                    {tr('免密直连模式', '免密直連模式', 'Passwordless LAN Mode')}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    {tr(
-                      '仅限受信任家庭内网：无需密码直接进入',
-                      '僅限受信任家庭內網：無需密碼直接進入',
-                      'Trusted home LAN only: Open access'
-                    )}
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Administrator Username */}
+        {/* Current Password */}
+        {authRequired && !(forcedFirstLogin && recentLoginPassword) && (
           <div>
             <label className="block text-slate-300 font-medium mb-1">
-              {tr('管理员用户名', '管理員使用者名稱', 'Administrator Username')}
+              {forcedFirstLogin
+                ? tr('初始临时密码 (当前密码)', '初始臨時密碼 (目前密碼)', 'Initial Temporary Password')
+                : tr('当前管理员密码', '目前管理員密碼', 'Current Password')}
             </label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-            />
-          </div>
-
-          {/* Current Password (shown if authRequired is currently true and not already pre-filled by immediate first login) */}
-          {authRequired && !(forcedFirstLogin && recentLoginPassword) && (
-            <div>
-              <label className="block text-slate-300 font-medium mb-1">
-                {forcedFirstLogin
-                  ? tr('初始临时密码 (当前密码)', '初始臨時密碼 (目前密碼)', 'Initial Temporary Password')
-                  : tr('当前管理员密码', '目前管理員密碼', 'Current Password')}
-              </label>
+            <div className="relative">
               <input
-                type="password"
+                type={showCurrentPw ? 'text' : 'password'}
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -367,94 +376,112 @@ export const SecurityCenterModal: React.FC<SecurityCenterModalProps> = ({
                   '輸入目前密碼以驗證身份',
                   'Enter current password to verify'
                 )}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-9 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
               />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPw((v) => !v)}
+                aria-label={tr('切换密码可见性', '切換密碼可見性', 'Toggle password visibility')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              >
+                {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* New Password Fields (shown when authEnabled is true) */}
-          {authEnabled && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  {requiresNewPassword || !authRequired
-                    ? tr('新管理员密码 *', '新管理員密碼 *', 'New Password *')
-                    : tr('新密码 (留空则不修改)', '新密碼 (留空則不修改)', 'New Password (optional)')}
-                </label>
+        {/* New Password Fields */}
+        {authEnabled && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">
+                {requiresNewPassword || !authRequired
+                  ? tr('新管理员密码 *', '新管理員密碼 *', 'New Password *')
+                  : tr('新密码 (留空则不修改)', '新密碼 (留空則不修改)', 'New Password (optional)')}
+              </label>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showNewPw ? 'text' : 'password'}
                   required={requiresNewPassword || !authRequired}
                   autoFocus={forcedFirstLogin}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder={tr('至少 6 位字符', '至少 6 位字元', 'At least 6 characters')}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-9 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  {tr('确认新密码', '確認新密碼', 'Confirm New Password')}
-                </label>
-                <input
-                  type="password"
-                  required={Boolean(newPassword) || requiresNewPassword || !authRequired}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder={tr('再次输入新密码', '再次輸入新密碼', 'Re-enter new password')}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw((v) => !v)}
+                  aria-label={tr('切换密码可见性', '切換密碼可見性', 'Toggle password visibility')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                >
+                  {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
-          )}
 
-          {/* CLI Reset Tip */}
-          {!forcedFirstLogin && (
-            <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 space-y-1.5 text-[11px] text-slate-400">
-              <div className="flex items-center gap-1.5 text-slate-300 font-medium">
-                <Terminal className="w-3.5 h-3.5 text-sky-400" />
-                <span>
-                  {tr(
-                    '忘记密码如何重置？(Docker CLI 一键重置)',
-                    '忘記密碼如何重置？(Docker CLI 一鍵重置)',
-                    'Forgot password? Reset via Docker CLI:'
-                  )}
-                </span>
-              </div>
-              <code className="block font-mono text-[10px] text-sky-300 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-800 select-all">
-                docker exec -it rclonebrowser-next node dist/server/reset-password.js
-              </code>
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">
+                {tr('确认新密码', '確認新密碼', 'Confirm New Password')}
+              </label>
+              <input
+                type={showNewPw ? 'text' : 'password'}
+                required={Boolean(newPassword) || requiresNewPassword || !authRequired}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={tr('再次输入新密码', '再次輸入新密碼', 'Re-enter new password')}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-sky-500"
+              />
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
-            {!forcedFirstLogin && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
-              >
-                {tr('取消', '取消', 'Cancel')}
-              </button>
-            )}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold transition-colors shadow"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>
-                {submitting
-                  ? tr('正在保存...', '正在儲存...', 'Saving...')
-                  : forcedFirstLogin
-                    ? tr('保存新密码并进入系统', '儲存新密碼並進入系統', 'Save Password & Continue')
-                    : tr('保存安全设置', '儲存安全設定', 'Save Security Settings')}
-              </span>
-            </button>
           </div>
-        </form>
-      </div>
-    </div>
+        )}
+
+        {/* CLI Reset Tip */}
+        {!forcedFirstLogin && (
+          <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 space-y-1.5 text-[11px] text-slate-400">
+            <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+              <Terminal className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
+              <span>
+                {tr(
+                  '忘记密码如何重置？(Docker CLI 一键重置)',
+                  '忘記密碼如何重置？(Docker CLI 一鍵重置)',
+                  'Forgot password? Reset via Docker CLI:'
+                )}
+              </span>
+            </div>
+            <code className="block font-mono text-[10px] text-sky-600 dark:text-sky-300 bg-slate-900 px-2.5 py-1.5 rounded border border-slate-800 select-all">
+              docker exec -it rclonebrowser-next node dist/server/reset-password.js
+            </code>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+          {!forcedFirstLogin && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+            >
+              {tr('取消', '取消', 'Cancel')}
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold transition-colors shadow"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>
+              {submitting
+                ? tr('正在保存...', '正在儲存...', 'Saving...')
+                : forcedFirstLogin
+                  ? tr('保存新密码并进入系统', '儲存新密碼並進入系統', 'Save Password & Continue')
+                  : tr('保存安全设置', '儲存安全設定', 'Save Security Settings')}
+            </span>
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
