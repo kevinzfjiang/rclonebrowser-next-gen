@@ -14,6 +14,11 @@ import { FileEntry, RemoteInfo } from '../../../shared/types';
 import { api } from '../../api';
 import { useI18n } from '../../i18n';
 import { formatRemoteFullPath } from '../../utils/format';
+import {
+  getCachedDirectory,
+  invalidateDirectoryCache,
+  setCachedDirectory,
+} from '../../utils/fsCache';
 import { ALERT_TONES } from '../../utils/themeStyles';
 import { Modal } from './Modal';
 import { RemoteSelect } from './RemoteSelect';
@@ -44,6 +49,8 @@ export const PathPickerModal: React.FC<PathPickerModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reqIdRef = useRef(0);
+  const trRef = useRef(tr);
+  trRef.current = tr;
 
   useEffect(() => {
     if (isOpen) {
@@ -52,27 +59,43 @@ export const PathPickerModal: React.FC<PathPickerModalProps> = ({
     }
   }, [isOpen, initialRemote, initialPath, remotes]);
 
-  const loadFolders = useCallback(async (rName: string, pathStr: string) => {
+  const loadFolders = useCallback(async (rName: string, pathStr: string, force = false) => {
     const reqId = ++reqIdRef.current;
-    setLoading(true);
+    const toSortedDirs = (items: FileEntry[]) =>
+      items
+        .filter((e) => e.IsDir)
+        .sort((a, b) => a.Name.localeCompare(b.Name, undefined, { numeric: true }));
+
+    const cached = getCachedDirectory(rName, pathStr);
+    if (cached && !force) {
+      setFolders(toSortedDirs(cached.entries));
+      setError(null);
+      if (!cached.isStale) {
+        setLoading(false);
+        return;
+      }
+    }
+
+    setLoading(!cached || force);
     setError(null);
     try {
       const res = await api.listDirectory(rName, pathStr);
       if (reqId !== reqIdRef.current) return;
-      const dirs = (res.entries || [])
-        .filter((e) => e.IsDir)
-        .sort((a, b) => a.Name.localeCompare(b.Name, undefined, { numeric: true }));
-      setFolders(dirs);
+      const entries = res.entries || [];
+      setCachedDirectory(rName, pathStr, entries);
+      setFolders(toSortedDirs(entries));
     } catch (err: any) {
       if (reqId !== reqIdRef.current) return;
-      setError(err.message || tr('加载目录失败', '載入目錄失敗', 'Failed to load directory'));
-      setFolders([]);
+      if (!cached || force) {
+        setError(err.message || trRef.current('加载目录失败', '載入目錄失敗', 'Failed to load directory'));
+        setFolders([]);
+      }
     } finally {
       if (reqId === reqIdRef.current) {
         setLoading(false);
       }
     }
-  }, [tr]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -143,7 +166,10 @@ export const PathPickerModal: React.FC<PathPickerModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => loadFolders(remote, currentPath)}
+            onClick={() => {
+              invalidateDirectoryCache(remote, currentPath);
+              loadFolders(remote, currentPath, true);
+            }}
             title={tr('刷新', '重新整理', 'Refresh')}
             className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-sky-400"
           >

@@ -51,6 +51,7 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { PreferencesMenu } from './components/ui/PreferencesMenu';
 import { useI18n } from './i18n';
 import { formatRemoteFullPath, formatSpeed } from './utils/format';
+import { clearAllFsCache } from './utils/fsCache';
 import { ALERT_TONES, BADGE_TONES, TEXT_TONES, TINT_BUTTON_TONES } from './utils/themeStyles';
 
 type NavSection = 'explorer' | 'tasks' | 'remotes' | 'schedules';
@@ -281,6 +282,7 @@ export const App: React.FC = () => {
       hasActiveTasksRef.current = runningNow > 0;
 
       if (prevRunningCountRef.current > 0 && runningNow < prevRunningCountRef.current) {
+        clearAllFsCache();
         setRefreshSignal((s) => s + 1);
         loadSchedules();
       }
@@ -391,6 +393,7 @@ export const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    clearAllFsCache();
     setAuthToken('');
     setRecentLoginPassword('');
     setSecurityModalOpen(false);
@@ -544,7 +547,7 @@ export const App: React.FC = () => {
   ).length;
 
   const enabledSchedulesCount = schedules.filter((s) => s.enabled).length;
-  const displayAppVersion = systemStatus?.appVersion || '2.6';
+  const displayAppVersion = systemStatus?.appVersion || '2.7';
   const activeFilterCount = useMemo(
     () => parseExcludePatterns(globalExclude).length,
     [globalExclude]
@@ -910,17 +913,23 @@ export const App: React.FC = () => {
 
       {/* Main Content Workspace */}
       <main className="flex-1 min-h-0 p-2.5 sm:p-3 overflow-hidden">
-        {activeNav === 'explorer' && (
-          <div
-            className={`h-full min-h-0 grid gap-2.5 ${
-              dualPane
-                ? 'grid-cols-1 grid-rows-2 lg:grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)] lg:grid-rows-1'
-                : 'grid-cols-1 grid-rows-1'
-            }`}
-          >
+        {/* Keep Explorer mounted across nav switches to avoid reloading cloud remotes */}
+        <div
+          aria-hidden={activeNav !== 'explorer'}
+          className={
+            activeNav !== 'explorer'
+              ? 'hidden'
+              : `h-full min-h-0 grid gap-2.5 ${
+                  dualPane
+                    ? 'grid-cols-1 grid-rows-2 lg:grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)] lg:grid-rows-1'
+                    : 'grid-cols-1 grid-rows-1'
+                }`
+          }
+        >
             <FilePane
               paneSide={dualPane ? 'left' : 'single'}
-              isActivePane={!dualPane || activePaneSide === 'left'}
+              isVisible={activeNav === 'explorer'}
+              isActivePane={activeNav === 'explorer' && (!dualPane || activePaneSide === 'left')}
               onFocusPane={() => setActivePaneSide('left')}
               remotes={remotes}
               tabs={leftTabs}
@@ -1064,7 +1073,8 @@ export const App: React.FC = () => {
             {dualPane && (
               <FilePane
                 paneSide="right"
-                isActivePane={activePaneSide === 'right'}
+                isVisible={activeNav === 'explorer'}
+                isActivePane={activeNav === 'explorer' && activePaneSide === 'right'}
                 onFocusPane={() => setActivePaneSide('right')}
                 remotes={remotes}
                 tabs={rightTabs}
@@ -1091,8 +1101,7 @@ export const App: React.FC = () => {
                 onToggleDualPane={() => setDualPane(false)}
               />
             )}
-          </div>
-        )}
+        </div>
 
         {activeNav === 'tasks' && (
           <TasksView

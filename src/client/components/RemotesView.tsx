@@ -27,6 +27,7 @@ import {
 } from '../../shared/types';
 import { api } from '../api';
 import { useI18n } from '../i18n';
+import { clearAllFsCache, invalidateRemoteCache, setCachedQuota } from '../utils/fsCache';
 import { localizeTemplate } from '../utils/templateI18n';
 import { ALERT_TONES, BADGE_TONES, TINT_BUTTON_TONES } from '../utils/themeStyles';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -113,6 +114,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setRawSaving(true);
     try {
       await api.saveRawConfig(rawContent);
+      clearAllFsCache();
       setSavedRawContent(rawContent);
       onNotify(
         tr(
@@ -161,6 +163,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setLoadingQuota(name);
     try {
       const q = await api.getRemoteQuota(name);
+      setCachedQuota(name, q);
       setQuotas((prev) => ({ ...prev, [name]: q }));
       if (q.supported) {
         onNotify(
@@ -338,6 +341,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
         params: mergedParams,
         obscurePasswords,
       });
+      invalidateRemoteCache(remoteName.trim());
       setShowWizard(false);
       onNotify(
         tr(
@@ -363,6 +367,7 @@ export const RemotesView: React.FC<RemotesViewProps> = ({
     setDeletingRemote(true);
     try {
       await api.deleteRemote(deleteTarget);
+      invalidateRemoteCache(deleteTarget);
       onNotify(
         tr(`已删除 Remote: ${deleteTarget}`, `已刪除 Remote: ${deleteTarget}`, `Deleted Remote: ${deleteTarget}`),
         'info'

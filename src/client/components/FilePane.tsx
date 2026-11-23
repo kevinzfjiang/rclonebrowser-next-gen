@@ -53,6 +53,15 @@ import {
   formatSpeed,
   getFileCategory,
 } from '../utils/format';
+import {
+  getCachedDirectory,
+  getCachedQuota,
+  invalidateDirectoryCache,
+  invalidateQuotaCache,
+  makeDirCacheKey,
+  setCachedDirectory,
+  setCachedQuota,
+} from '../utils/fsCache';
 import { ALERT_TONES, BADGE_TONES, TEXT_TONES, TINT_BUTTON_TONES } from '../utils/themeStyles';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Modal } from './ui/Modal';
@@ -73,6 +82,7 @@ export interface SelectedTransferItem {
 
 interface FilePaneProps {
   paneSide: 'left' | 'right' | 'single';
+  isVisible?: boolean;
   isActivePane?: boolean;
   onFocusPane?: () => void;
   remotes: RemoteInfo[];
@@ -107,6 +117,7 @@ const OVERSCAN = 12;
 
 export const FilePane: React.FC<FilePaneProps> = ({
   paneSide,
+  isVisible = true,
   isActivePane = false,
   onFocusPane,
   remotes,
@@ -134,6 +145,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -174,6 +186,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
   // Virtual scrolling state
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const savedScrollTopRef = useRef(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(480);
 
@@ -182,6 +195,18 @@ export const FilePane: React.FC<FilePaneProps> = ({
   const listReqIdRef = useRef(0);
   const quotaReqIdRef = useRef(0);
   const lastClickedIdxRef = useRef<number | null>(null);
+  const loadedTargetKeyRef = useRef<string>('');
+  const prevRefreshSignalRef = useRef(refreshSignal);
+  const prevQuotaRefreshSignalRef = useRef(refreshSignal);
+  const errorRef = useRef<string | null>(error);
+  errorRef.current = error;
+  const trRef = useRef(tr);
+  trRef.current = tr;
+  const onNotifyRef = useRef(onNotify);
+  onNotifyRef.current = onNotify;
+
+  const activeRemote = activeTab?.remote ?? '';
+  const activePath = activeTab?.path ?? '';
 
   const getDirSizeKey = useCallback(
     (remote: string, entryPath: string) => `${remote}:${entryPath}`,
@@ -200,11 +225,29 @@ export const FilePane: React.FC<FilePaneProps> = ({
   useEffect(() => {
     setSearchQuery('');
     lastClickedIdxRef.current = null;
+    savedScrollTopRef.current = 0;
     if (listContainerRef.current) {
       listContainerRef.current.scrollTop = 0;
       setScrollTop(0);
     }
-  }, [activeTab?.id, activeTab?.remote, activeTab?.path]);
+  }, [activeTab?.id, activeRemote, activePath]);
+
+  // Preserve scroll position & close transient context menu across keep-alive hide/show
+  useEffect(() => {
+    if (!isVisible) {
+      setContextMenu(null);
+      return;
+    }
+    const el = listContainerRef.current;
+    if (el) {
+      if (el.clientHeight > 0) {
+        setViewportHeight(el.clientHeight);
+      }
+      if (savedScrollTopRef.current > 0) {
+        el.scrollTop = savedScrollTopRef.current;
+      }
+    }
+  }, [isVisible]);
 
   // External clear selection trigger (e.g., from Center Shuttle Bar)
   useEffect(() => {
@@ -218,7 +261,11 @@ export const FilePane: React.FC<FilePaneProps> = ({
   useEffect(() => {
     const el = listContainerRef.current;
     if (!el) return;
-    const updateHeight = () => setViewportHeight(el.clientHeight || 480);
+    const updateHeight = () => {
+      if (el.clientHeight > 0) {
+        setViewportHeight(el.clientHeight);
+      }
+    };
     updateHeight();
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(updateHeight);
@@ -229,54 +276,110 @@ export const FilePane: React.FC<FilePaneProps> = ({
     return () => window.removeEventListener('resize', updateHeight);
   }, []);
 
-  // Load directory with AbortController + request sequence guard (no race conditions)
+  // Load directory with in-memory LRU/SWR cache, AbortController & sequence guard
   const loadDirectory = useCallback(
-    async (externalSignal?: AbortSignal) => {
-      if (!activeTab) return;
+    async (options?: { signal?: AbortSignal; force?: boolean }) => {
+      if (!activeRemote) return;
       const reqId = ++listReqIdRef.current;
-      setLoading(true);
+      const force = Boolean(options?.force);
+      const externalSignal = options?.signal;
+      const targetKey = makeDirCacheKey(activeRemote, activePath);
+      const sameTarget = loadedTargetKeyRef.current === targetKey;
+
+      if (!sameTarget) {
+        setSelectedPaths(new Set());
+        lastClickedIdxRef.current = null;
+      }
+
+      const cached = getCachedDirectory(activeRemote, activePath);
+      if (cached && !force) {
+        setEntries(cached.entries);
+        setError(null);
+        loadedTargetKeyRef.current = targetKey;
+        setLoading(false);
+
+        if (!cached.isStale) {
+          setRefreshing(false);
+          return;
+        }
+      }
+
+      const hasVisibleData = Boolean(cached) || (force && sameTarget && !errorRef.current);
+      if (hasVisibleData) {
+        setLoading(false);
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+        setRefreshing(false);
+      }
       setError(null);
-      setSelectedPaths(new Set());
-      lastClickedIdxRef.current = null;
+
       try {
-        const res = await api.listDirectory(activeTab.remote, activeTab.path, externalSignal);
+        const res = await api.listDirectory(activeRemote, activePath, externalSignal);
         if (reqId !== listReqIdRef.current) return;
-        setEntries(res.entries || []);
+        const nextEntries = res.entries || [];
+        setCachedDirectory(activeRemote, activePath, nextEntries);
+        setEntries(nextEntries);
+        loadedTargetKeyRef.current = targetKey;
       } catch (err: any) {
         if (err?.name === 'AbortError' || reqId !== listReqIdRef.current) return;
-        setError(err.message || tr('无法加载目录', '無法載入目錄', 'Failed to load directory'));
-        setEntries([]);
+        const errMsg =
+          err.message || trRef.current('无法加载目录', '無法載入目錄', 'Failed to load directory');
+        if (hasVisibleData) {
+          if (force) {
+            onNotifyRef.current(errMsg, 'error');
+          }
+        } else {
+          setError(errMsg);
+          setEntries([]);
+          loadedTargetKeyRef.current = '';
+        }
       } finally {
         if (reqId === listReqIdRef.current) {
           setLoading(false);
+          setRefreshing(false);
         }
       }
     },
-    [activeTab, tr]
+    [activeRemote, activePath]
   );
 
   useEffect(() => {
+    const isRefreshTrigger = prevRefreshSignalRef.current !== refreshSignal;
+    prevRefreshSignalRef.current = refreshSignal;
     const controller = new AbortController();
-    loadDirectory(controller.signal);
+    loadDirectory({ signal: controller.signal, force: isRefreshTrigger });
     return () => controller.abort();
   }, [loadDirectory, refreshSignal]);
 
-  // Load quota with AbortController + sequence guard
+  // Load quota with in-memory cache, AbortController + sequence guard
   useEffect(() => {
-    if (!activeTab) return;
+    if (!activeRemote) return;
+    const isRefreshTrigger = prevQuotaRefreshSignalRef.current !== refreshSignal;
+    prevQuotaRefreshSignalRef.current = refreshSignal;
+
     const reqId = ++quotaReqIdRef.current;
+    const cached = getCachedQuota(activeRemote);
+    if (cached && !isRefreshTrigger) {
+      setQuota(cached.quota.supported ? cached.quota : null);
+      if (!cached.isStale) {
+        return;
+      }
+    } else if (!cached && !isRefreshTrigger) {
+      setQuota(null);
+    }
+
     const controller = new AbortController();
-    setQuota(null);
     api
-      .getRemoteQuota(activeTab.remote, controller.signal)
+      .getRemoteQuota(activeRemote, controller.signal)
       .then((q) => {
-        if (reqId === quotaReqIdRef.current && q.supported) {
-          setQuota(q);
-        }
+        if (reqId !== quotaReqIdRef.current) return;
+        setCachedQuota(activeRemote, q);
+        setQuota(q.supported ? q : null);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [activeTab?.remote]);
+  }, [activeRemote, refreshSignal]);
 
   // Select filename without extension when opening Rename modal
   useEffect(() => {
@@ -554,7 +657,8 @@ export const FilePane: React.FC<FilePaneProps> = ({
         tr(`已创建目录: ${cleanName}`, `已建立目錄: ${cleanName}`, `Created folder: ${cleanName}`),
         'success'
       );
-      loadDirectory();
+      invalidateDirectoryCache(activeTab.remote, activeTab.path);
+      loadDirectory({ force: true });
     } catch (err: any) {
       onNotify(
         err.message || tr('创建目录失败', '建立目錄失敗', 'Failed to create folder'),
@@ -586,7 +690,11 @@ export const FilePane: React.FC<FilePaneProps> = ({
         ),
         'success'
       );
-      loadDirectory();
+      invalidateDirectoryCache(activeTab.remote, activeTab.path);
+      if (renameTarget.IsDir) {
+        invalidateDirectoryCache(activeTab.remote, renameTarget.Path, true);
+      }
+      loadDirectory({ force: true });
     } catch (err: any) {
       onNotify(err.message || tr('重命名失败', '重新命名失敗', 'Rename failed'), 'error');
     }
@@ -608,8 +716,17 @@ export const FilePane: React.FC<FilePaneProps> = ({
         ),
         'success'
       );
+      invalidateDirectoryCache(activeTab.remote, activeTab.path);
+      for (const item of deleteConfirmItems) {
+        if (item.IsDir) {
+          invalidateDirectoryCache(activeTab.remote, item.Path, true);
+        }
+      }
+      invalidateQuotaCache(activeTab.remote);
       setDeleteConfirmItems(null);
-      loadDirectory();
+      setSelectedPaths(new Set());
+      lastClickedIdxRef.current = null;
+      loadDirectory({ force: true });
     } catch (err: any) {
       onNotify(err.message || tr('删除失败', '刪除失敗', 'Delete failed'), 'error');
     } finally {
@@ -693,7 +810,9 @@ export const FilePane: React.FC<FilePaneProps> = ({
         ),
         'success'
       );
-      loadDirectory();
+      invalidateDirectoryCache(activeTab.remote, activeTab.path);
+      invalidateQuotaCache(activeTab.remote);
+      loadDirectory({ force: true });
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         onNotify(tr('已取消文件上传', '已取消檔案上傳', 'Upload cancelled'), 'info');
@@ -1019,12 +1138,16 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
         <button
           type="button"
-          onClick={() => loadDirectory()}
+          onClick={() => {
+            invalidateDirectoryCache(activeTab.remote, activeTab.path);
+            invalidateQuotaCache(activeTab.remote);
+            loadDirectory({ force: true });
+          }}
           aria-label={tr('刷新目录', '重新整理目錄', 'Refresh')}
           title={tr('刷新目录', '重新整理目錄', 'Refresh')}
           className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-sky-400 hover:border-slate-700 transition-colors shrink-0"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${loading || refreshing ? 'animate-spin text-sky-400' : ''}`} />
         </button>
       </div>
 
@@ -1229,6 +1352,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
       <div
         ref={listContainerRef}
         onScroll={(e) => {
+          savedScrollTopRef.current = e.currentTarget.scrollTop;
           if (shouldVirtualize) {
             setScrollTop(e.currentTarget.scrollTop);
           }
@@ -1263,7 +1387,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
               )}
               <button
                 type="button"
-                onClick={() => loadDirectory()}
+                onClick={() => loadDirectory({ force: true })}
                 className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs text-white"
               >
                 {tr('重试', '重試', 'Retry')}
